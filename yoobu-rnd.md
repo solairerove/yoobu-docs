@@ -80,6 +80,24 @@ Client selects service from list → leaves name/phone/comment → owner contact
 Examples: repair shop, cleaning service, legal consultation.
 No cart, no slots — just a structured inquiry form.
 
+### Booking Validation Rules by Type
+
+Backend enforces mandatory fields per `BookingType` at creation time. Requests missing required fields are rejected with 400.
+
+| Field | FOOD_ORDER (ORDER) | APPOINTMENT | CATALOG_REQUEST (REQUEST) |
+|-------|-------------------|-------------|--------------------------|
+| `customer_name` | required | required | required |
+| `customer_phone` | required | optional | required |
+| `delivery_date` | required | — ignored | — ignored |
+| `items[]` (BookingItem) | required, min 1 | — ignored | — ignored |
+| `slot_id` | — ignored | required | — ignored |
+| `service_id` | — ignored | required | optional |
+| `note` | optional | optional | optional |
+
+"Ignored" means: even if sent, backend does not persist. No silent data leaking between flows.
+
+`total_price` on `booking` is computed server-side from `sum(booking_item.unit_price * quantity)` for FOOD_ORDER. For APPOINTMENT — copied from `service.price`. For REQUEST — null.
+
 ---
 
 ## Architecture
@@ -95,6 +113,7 @@ No cart, no slots — just a structured inquiry form.
 com.yoobu.api
 ├── config/
 │   ├── AppProperties.java
+│   ├── SecurityConfig.java        // Spring Security filter chains (tenant admin + superadmin)
 │   ├── WebConfig.java
 │   └── TenantContext.java         // ThreadLocal tenant storage
 │
@@ -246,6 +265,7 @@ CREATE TABLE booking (
     customer_phone      VARCHAR(50),
     status              VARCHAR(20) NOT NULL DEFAULT 'NEW',
     note                TEXT,
+    total_price         NUMERIC(10, 2),                 -- computed server-side, NULL for REQUEST
     delivery_date       DATE,                           -- FOOD_ORDER only
     slot_id             BIGINT REFERENCES slot(id),     -- APPOINTMENT only
     service_id          BIGINT REFERENCES service(id),  -- APPOINTMENT and REQUEST
@@ -310,10 +330,153 @@ POST   /admin/{slug}/services                  -- create service
 PUT    /admin/{slug}/services/{id}             -- update service
 DELETE /admin/{slug}/services/{id}             -- soft delete
 
+GET    /admin/{slug}/staff                     -- list staff
+POST   /admin/{slug}/staff                     -- create staff member
+PUT    /admin/{slug}/staff/{id}                -- update staff member
+DELETE /admin/{slug}/staff/{id}                -- soft delete
+
+GET    /admin/{slug}/slots?date=2026-03-15     -- list slots for date
+POST   /admin/{slug}/slots                     -- create single slot manually
+DELETE /admin/{slug}/slots/{id}                -- delete slot (only if not booked)
+
 GET    /superadmin/tenants                     -- list all tenants
 POST   /superadmin/tenants                     -- create tenant
 PUT    /superadmin/tenants/{id}                -- update tenant
 ```
+
+---
+
+## DTO Contracts
+
+### Client-facing DTOs
+
+**TenantConfigResponse** — `GET /t/{slug}/config`
+```json
+{
+  "slug": "dark-kitchen-dn",
+  "name": "Dark Kitchen Da Nang",
+  "type": "FOOD_ORDER",
+  "primaryColor": "#FF6B35",
+  "logoUrl": "https://...",
+  "welcomeMessage": "Welcome! Order by 14:00 for same-day delivery."
+}
+```
+
+**ServiceResponse** — `GET /t/{slug}/services`
+```json
+{
+  "id": 1,
+  "name": "Борщ 0.5л",
+  "description": "Классический, со сметаной",
+  "price": 85000.00,
+  "unit": "шт",
+  "durationMinutes": null,
+  "sortOrder": 0
+}
+```
+`durationMinutes` present only for APPOINTMENT tenants. `unit` present only for FOOD_ORDER tenants. Frontend ignores irrelevant fields based on tenant type.
+
+**CreateBookingRequest** — `POST /t/{slug}/bookings`
+
+FOOD_ORDER:
+```json
+{
+  "customerName": "Алексей",
+  "customerPhone": "+84901234567",
+  "deliveryDate": "2026-03-15",
+  "note": "без лука",
+  "items": [
+    { "serviceId": 1, "quantity": 2 },
+    { "serviceId": 3, "quantity": 1 }
+  ]
+}
+```
+
+APPOINTMENT:
+```json
+{
+  "customerName": "Алексей",
+  "customerPhone": "+84901234567",
+  "serviceId": 5,
+  "slotId": 42,
+  "note": "first visit"
+}
+```
+
+CATALOG_REQUEST:
+```json
+{
+  "customerName": "Алексей",
+  "customerPhone": "+84901234567",
+  "serviceId": 12,
+  "note": "Нужна глубокая чистка кондиционера, 2 внутренних блока"
+}
+```
+
+`type` is NOT sent by client — derived from `tenant.type` on backend.
+
+**BookingResponse** — `GET /t/{slug}/bookings/{id}`, items in `/bookings/my` list
+```json
+{
+  "id": 42,
+  "type": "ORDER",
+  "status": "CONFIRMED",
+  "customerName": "Алексей",
+  "totalPrice": 255000.00,
+  "deliveryDate": "2026-03-15",
+  "note": "без лука",
+  "items": [
+    { "serviceName": "Борщ 0.5л", "quantity": 2, "unitPrice": 85000.00 },
+    { "serviceName": "Хлеб", "quantity": 1, "unitPrice": 25000.00 }
+  ],
+  "slotStartsAt": null,
+  "slotEndsAt": null,
+  "serviceName": null,
+  "staffName": null,
+  "createdAt": "2026-03-14T10:30:00+07:00"
+}
+```
+Flat structure. Null fields for irrelevant type. Frontend renders only what's present for the tenant type.
+
+**SlotResponse** — `GET /t/{slug}/slots?date=...`
+```json
+{
+  "id": 42,
+  "startsAt": "2026-03-15T14:00:00+07:00",
+  "endsAt": "2026-03-15T14:30:00+07:00",
+  "staffName": "Миша"
+}
+```
+Only unbooked slots returned to client.
+
+### Admin DTOs
+
+**DailySummaryResponse** — `GET /admin/{slug}/bookings/summary`
+```json
+{
+  "date": "2026-03-15",
+  "totalBookings": 12,
+  "byStatus": { "NEW": 3, "CONFIRMED": 8, "DONE": 1, "CANCELLED": 0 },
+  "totalRevenue": 2450000.00
+}
+```
+
+**UpdateStatusRequest** — `PUT /admin/{slug}/bookings/{id}/status`
+```json
+{
+  "status": "CONFIRMED"
+}
+```
+
+**CreateSlotRequest** — `POST /admin/{slug}/slots`
+```json
+{
+  "staffId": 1,
+  "startsAt": "2026-03-15T14:00:00+07:00",
+  "endsAt": "2026-03-15T14:30:00+07:00"
+}
+```
+`staffId` optional. Slot duration not auto-derived from service — owner sets explicitly.
 
 ---
 
@@ -390,15 +553,16 @@ All via `TelegramNotifier.sendMessage(botToken, chatId, text)` — plain HTTP PO
 Two levels:
 
 **Tenant admin** (`/admin/{slug}/`)
-- Login via Telegram (owner_telegram_id check) or simple form login with credentials from tenant_config
+- Auth: Spring Security HTTP Basic Auth. Credentials stored in `tenant_config` keys `admin_username` and `admin_password` (bcrypt hash). No session, no form login, no Telegram login in MVP.
+- Spring Security filter chain: `/admin/{slug}/**` requires ROLE_TENANT_ADMIN, resolved by matching Basic credentials against tenant_config for the given slug.
 - Dashboard: today's bookings count, upcoming slots
 - Bookings list: filter by date, status
 - Daily summary view
 - Service management: create, edit, deactivate
-- Slot management (APPOINTMENT only): open/close time slots
+- Slot management (APPOINTMENT only): create and delete individual slots manually. No schedule generator — owner creates each slot by hand (start time + end time + optional staff). Sufficient for MVP scale.
 
 **Super admin** (`/superadmin/`)
-- Protected by separate credentials from environment variables
+- Auth: Spring Security HTTP Basic Auth. Credentials from environment variables (`SUPERADMIN_USER`, `SUPERADMIN_PASS`).
 - Tenant list: create, edit, activate/deactivate
 - Per-tenant config editor
 
@@ -435,6 +599,8 @@ summary_cron         -- cron expression for daily summary
 primary_color        -- hex color for frontend theme
 logo_url             -- public image URL
 welcome_message      -- shown on Mini App open
+admin_username       -- HTTP Basic Auth username for /admin/{slug}/**
+admin_password       -- HTTP Basic Auth password (bcrypt hash)
 ```
 
 ---
