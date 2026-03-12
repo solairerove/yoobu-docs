@@ -67,10 +67,9 @@ Build only for `FOOD_ORDER` in phase 1:
 - admin bookings list and status update
 - Telegram booking confirmation and status notifications
 
-Defer real delivery of other flows:
+Defer real delivery of other flows (tables created in V1 migration, no business logic until food flow is stable):
 
-- `slot`
-- `staff`
+- `slot` and `staff` — CRUD, availability, booking integration
 - appointment availability rules
 - request-only booking forms
 
@@ -79,7 +78,7 @@ Defer real delivery of other flows:
 ### Phase 1: foundation
 
 - Initialize Spring Boot project
-- Add Flyway and baseline schema for `tenant`, `tenant_config`, `service`, `booking`, `booking_item`, `audit_log`
+- Add Flyway and baseline schema for `tenant`, `tenant_config`, `service`, `booking`, `booking_item`, `slot`, `staff`, `audit_log` (slot and staff tables created empty — no logic until APPOINTMENT phase)
 - Add tenant context and tenant resolver
 - Add tenant-scoped repository conventions
 
@@ -101,8 +100,9 @@ Exit condition:
 Rules:
 
 - Booking type is derived from tenant type, not client input
+- Mandatory/ignored fields per booking type are defined in the Booking Validation Rules table in yoobu-rnd.md — backend rejects invalid requests with 400
 - Food order must have at least one item
-- Total price is computed server-side
+- `booking.total_price` is computed server-side from `sum(booking_item.unit_price * quantity)`
 - Service prices are copied into booking items at order time
 
 Exit condition:
@@ -157,7 +157,7 @@ If implementation starts now, the smallest useful slice is:
 
 1. Spring Boot skeleton
 2. Flyway V1
-3. `tenant` + `service` + `booking` + `booking_item`
+3. `tenant` + `service` + `booking` + `booking_item` + `slot` + `staff` (tables only)
 4. tenant resolution from slug
 5. food order create/list/detail endpoints
 

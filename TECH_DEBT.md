@@ -31,16 +31,21 @@ Later implementation note:
 - Evaluate session-variable or connection-setting based policies
 - Add RLS only after repository/query patterns settle
 
-### Tenant filter enforcement strategy
+### Tenant filter enforcement testing
 
 Status:
 
-- Not fully designed
+- Convention defined, automated enforcement missing
+
+Convention (defined in yoobu-rnd.md):
+
+- TenantResolver interceptor resolves tenant from slug, stores in TenantContext (ThreadLocal)
+- All repositories and services read tenantId from TenantContext, never from request parameters
 
 Debt:
 
-- Need a repeatable convention for tenant-aware repositories and service methods
-- Need tests that fail if data leaks across tenants
+- No integration tests that fail if a query omits tenant_id filter
+- No compile-time or startup-time check that all repository methods are tenant-scoped
 
 ## Configuration model
 
@@ -58,19 +63,22 @@ Likely follow-up:
 
 - Move security-sensitive or operationally critical settings to typed columns or dedicated tables
 
-### Tenant admin credentials stored in config
+### Tenant admin credentials in tenant_config
 
 Status:
 
-- Accepted for MVP with bcrypt hash only
+- Decided: Spring Security HTTP Basic Auth. Credentials stored as `admin_username` and `admin_password` (bcrypt hash) in `tenant_config`. Separate filter chain for `/admin/{slug}/**`.
 
 Risk:
 
-- Weak lifecycle for password rotation, auditing, and future multi-user admin support
+- No password rotation mechanism
+- No audit trail for admin logins
+- Single credential set per tenant — no multi-user admin support
 
 Likely follow-up:
 
 - Introduce `admin_user` table with tenant-scoped identities and roles
+- Optional: Telegram-based admin login via `owner_telegram_id`
 
 ## Product scope debt
 
@@ -118,7 +126,7 @@ Likely follow-up:
 
 Status:
 
-- MVP will likely use direct synchronous Bot API calls
+- Decided: synchronous HTTP POST to Telegram Bot API via `TelegramNotifier.sendMessage(botToken, chatId, text)`. No retry, no outbox.
 
 Risk:
 
@@ -136,15 +144,22 @@ Status:
 
 - Not implemented in MVP phase 1
 
+Current state:
+
+- `slot` table exists with `is_booked` flag
+- Admin creates slots manually via `POST /admin/{slug}/slots` (start time + end time + optional staff)
+- Client sees only unbooked slots via `GET /t/{slug}/slots?date=...`
+- No transactional lock on slot during booking creation yet
+
 Planned approach:
 
-- Use explicit `slot` rows
-- Lock slot row in booking transaction
-- Fail if slot is already booked
+- Lock slot row in booking transaction (SELECT FOR UPDATE or equivalent)
+- Set `is_booked = true` atomically with booking insert
+- Fail with 409 if slot is already booked
 
 Open question:
 
-- Whether additional DB constraints are needed beyond pessimistic locking
+- Whether additional DB constraints (unique partial index on slot where is_booked = true + booking.slot_id) are needed beyond pessimistic locking
 
 ## Observability and operations
 
