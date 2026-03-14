@@ -19,3 +19,4 @@ This document tracks product and engineering ideas to consider outside of Jira.
 13. [x] audits
 14. [x] show tenants with active not active statuses on superadmin page
 15. [ ] pagination on superadmin page?
+16. [ ] aop for auditing
