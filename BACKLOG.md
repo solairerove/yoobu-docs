@@ -20,3 +20,6 @@ This document tracks product and engineering ideas to consider outside of Jira.
 14. [x] show tenants with active not active statuses on superadmin page
 15. [ ] pagination on superadmin page?
 16. [ ] aop for auditing
+17. [ ] superadmin should be able to activate/deactivate services?
+18. [ ] on admin panel there should be a confirmation dialog for deleting a service
+19. [ ] on admin panel for booking and service statuses i think we should able to update status right here, rather then on detailed form.
