@@ -17,3 +17,5 @@ This document tracks product and engineering ideas to consider outside of Jira.
 11. [x] Superadmin panel на /superadmin/ — отдельный filter chain, отдельные Thymeleaf views. Тут живёт то, что тенанту не показывают: список тенантов, создание/деактивация, конфиг-редактор, read-only просмотр данных тенанта (bookings, services). Это не пересекается с tenant admin UI ни по маршрутам, ни по шаблонам.
 12. [ ] tenant crud by superadmin
 13. [ ] audits
+14. show tenants with active not active statuses on superadmin page
+15. pagination on superadmin page?
