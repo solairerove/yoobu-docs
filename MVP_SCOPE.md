@@ -45,6 +45,8 @@ Tenant model assumption for now:
 - Backend stack: Java 21, Spring Boot 3.x, PostgreSQL, Flyway
 - Telegram auth and notifications remain part of the backend
 - Admin panel remains server-rendered MVP infrastructure
+- Security: custom `OncePerRequestFilter` classes, not Spring `AuthenticationProvider`
+- Service status model: `ServiceStatus` enum (ACTIVE, INACTIVE, DELETED) replaces boolean `active`
 
 ## Generalize now vs later
 
@@ -67,28 +69,26 @@ Build only for `FOOD_ORDER` in phase 1:
 - admin bookings list and status update
 - Telegram booking confirmation and status notifications
 
-Defer real delivery of other flows (tables created in V1 migration, no business logic until food flow is stable):
+Defer real delivery of other flows (tables NOT created yet — schema designed, migration deferred until APPOINTMENT phase):
 
 - `slot` and `staff` — CRUD, availability, booking integration
 - appointment availability rules
 - request-only booking forms
 
-## Recommended phase order
+## Phase completion status
 
-### Phase 1: foundation
+### Phase 1: foundation — DONE
 
-- Initialize Spring Boot project
-- Add Flyway and baseline schema for `tenant`, `tenant_config`, `service`, `booking`, `booking_item`, `slot`, `staff`, `audit_log` (slot and staff tables created empty — no logic until APPOINTMENT phase)
-- Add tenant context and tenant resolver
-- Add tenant-scoped repository conventions
+- Initialized Spring Boot project
+- Flyway V1 baseline: `tenant`, `tenant_config`, `service`, `booking`, `booking_item`, `audit_log`
+- V2: `audit_log.actor_id` changed to VARCHAR
+- V3: `service.status` enum replaces boolean `active`
+- Tenant context via `TenantContextFilter` (OncePerRequestFilter)
+- Tenant-scoped repository conventions
 
-Exit condition:
+Note: `slot` and `staff` tables were NOT included in V1. They remain planned for APPOINTMENT phase.
 
-- App starts
-- Migrations run
-- Tenant is resolved from slug
-
-### Phase 2: food order customer API
+### Phase 2: food order customer API — DONE
 
 - `GET /t/{slug}/config`
 - `GET /t/{slug}/services`
@@ -100,46 +100,57 @@ Exit condition:
 Rules:
 
 - Booking type is derived from tenant type, not client input
+- Non-FOOD_ORDER tenants rejected with 400 before field validation
 - Mandatory/ignored fields per booking type are defined in the Booking Validation Rules table in yoobu-rnd.md — backend rejects invalid requests with 400
 - Food order must have at least one item
 - `booking.total_price` is computed server-side from `sum(booking_item.unit_price * quantity)`
 - Service prices are copied into booking items at order time
+- `deliveryDate` validated against tenant-local earliest allowed date via `TenantTimeService`
 
-Exit condition:
+### Phase 3: Telegram auth — PARTIALLY DONE
 
-- Customer can create and inspect a food order safely inside one tenant
+Done:
 
-### Phase 3: Telegram auth and notifications
+- Telegram Mini App init data validation (HMAC-SHA256)
+- Dev profile fallback via `X-Telegram-User-Id` header
 
-- Validate Telegram Mini App init data
-- Add local dev fallback header
-- Send owner notification on new order
-- Send client confirmation on order creation
-- Send client notification on status change
+Not done:
 
-Exit condition:
+- Telegram notifications on booking create (to client and owner)
+- Telegram notifications on status change
+- `TelegramNotifier` class does not exist yet
 
-- Telegram user identity reaches booking flow
-- Notifications are delivered from the tenant bot
+### Phase 4: tenant admin MVP — DONE
 
-### Phase 4: tenant admin MVP
+- HTTP Basic auth via custom `TenantBasicAuthenticationFilter`
+- Superadmin credentials also accepted on tenant admin endpoints
+- Thymeleaf panel: booking list (filter by date/status), booking detail, status change
+- Thymeleaf panel: service create/edit/soft delete
+- REST API: admin endpoints for bookings and services
 
-- HTTP Basic auth for one tenant admin
-- Booking list by date/status
-- Booking detail view
-- Status update endpoint/view
-- Service create/update/deactivate
+### Phase 5: superadmin — DONE
 
-Exit condition:
+- HTTP Basic auth via custom `SuperAdminBasicAuthenticationFilter`
+- Tenant CRUD (REST + Thymeleaf panel)
+- Slug availability check
+- Tenant detail view with config map
+- Does not yet have read-only view into tenant data (bookings, services)
 
-- Owner can manage orders without direct chat handling
+### Phase 6: test coverage — DONE
 
-### Phase 5: extension preparation
+- Integration tests on Testcontainers (PostgreSQL)
+- Cross-tenant isolation tests
+- Full booking lifecycle tests
+- Admin auth and access tests
+- Service management and validation tests
+- Admin and superadmin panel tests
+- Tenant-local time/cutoff unit tests
 
-- Harden tenant isolation tests
-- Define typed config migration path for security-sensitive settings
-- Design `APPOINTMENT` on top of the same booking aggregate
-- Add `slot` and `staff` only when food flow is stable
+## What's next
+
+1. Angular Mini App — `FoodOrderModule` for Telegram (step 10 in rnd)
+2. Telegram notifications — on booking create and status change (step 8 in rnd)
+3. First live tenant
 
 ## Design constraints for future flows
 
@@ -150,15 +161,3 @@ To avoid rewriting later:
 - flow-specific fields may be nullable when irrelevant
 - controllers and services branch by `tenant.type`
 - frontend modules stay flow-specific even if backend stays shared
-
-## Immediate next build slice
-
-If implementation starts now, the smallest useful slice is:
-
-1. Spring Boot skeleton
-2. Flyway V1
-3. `tenant` + `service` + `booking` + `booking_item` + `slot` + `staff` (tables only)
-4. tenant resolution from slug
-5. food order create/list/detail endpoints
-
-That slice is enough to validate the domain model before adding Telegram auth and admin UI.
