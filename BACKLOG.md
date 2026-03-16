@@ -23,3 +23,4 @@ This document tracks product and engineering ideas to consider outside of Jira.
 17. [ ] superadmin should be able to activate/deactivate services?
 18. [ ] on admin panel there should be a confirmation dialog for deleting a service
 19. [ ] on admin panel for booking and service statuses i think we should able to update status right here, rather then on detailed form.
+20. [ ] phone place holder `+84...` as part of the config, Note `no onion, gate code, delivery code` as well
