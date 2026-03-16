@@ -24,3 +24,7 @@ This document tracks product and engineering ideas to consider outside of Jira.
 18. [ ] on admin panel there should be a confirmation dialog for deleting a service
 19. [ ] on admin panel for booking and service statuses i think we should able to update status right here, rather then on detailed form.
 20. [ ] phone place holder `+84...` as part of the config, Note `no onion, gate code, delivery code` as well
+21. [ ] Preserve customer form values between orders instead of resetting name/phone every time.
+22. [ ] Add Telegram-native confirm/alert UX for cancel and submit failures.
+23. [ ] Add booking status emphasis and maybe a compact timeline/receipt view.
+24. [ ] Then, if needed, split checkout and bookings into smaller components so this screen stops growing into a monolith.
