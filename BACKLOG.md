@@ -31,3 +31,4 @@ This document tracks product and engineering ideas to consider outside of Jira.
 25. [ ] reorder booking
 26. [ ] recent order status is not updated
 27. [ ] if phone or name are not filled, show a warning
+28. [ ] new angular admin panel [doc](https://github.com/solairerove/yoobu-docs/blob/master/admin-panel-rnd.md)
