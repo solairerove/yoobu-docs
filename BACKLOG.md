@@ -6,7 +6,7 @@ This document tracks product and engineering ideas to consider outside of Jira.
 
 1. [x] API to check whether a suggested or requested tenant is unique before creation.
 2. [x] As a super admin, I want to be able to check the services and catalogs of a tenant admin.
-3. [x] ~~rename service as catalog~~
+3. [ ] ~~rename service as catalog~~
 4. [x] {{host}}/admin/dark-kitchen-dn/bookings?status=NEW&deliveryDate=2026-03-14 doesn't work
 5. [x] SecurityConfig — сделать до админки, не после. Thymeleaf-контроллеры для /admin/{slug}/** сразу должны жить за правильным filter chain. Если SecurityConfig ещё не написан — это первое, что делается. Два chain: один для /admin/{slug}/** (Basic Auth против tenant_config), второй для /superadmin/** (Basic Auth против env vars). Клиентские /t/{slug}/** остаются открытыми (auth через Telegram header позже). Писать админку без security config — потом переделывать всю маршрутизацию.
 6. [x] Superadmin read-only view на данные тенантов — это не "потом решу", это операционная необходимость с первого живого тенанта. Не нужна полная админка — достаточно GET /superadmin/tenants/{id}/bookings и GET /superadmin/tenants/{id}/services. Пять строк в контроллере. Без этого первый баг-репорт от тенанта = лезть в psql.
@@ -18,30 +18,32 @@ This document tracks product and engineering ideas to consider outside of Jira.
 12. [x] tenant crud by superadmin
 13. [x] audits
 14. [x] show tenants with active not active statuses on superadmin page
-15. [ ] Add search/sort/pagination for bookings, services, and tenants lists. Right now they render full tables only, so operations degrade as data grows: bookings.html, services.html, tenants.html.
+15. [x] Add search/sort/pagination for bookings, services, and tenants lists. Right now they render full tables only, so operations degrade as data grows: bookings.html, services.html, tenants.html.
 16. [ ] aop for auditing
 17. [x] superadmin should be able to activate/deactivate services?
 18. [x] on admin panel there should be a confirmation dialog for deleting a service
 19. [x] on admin panel for booking and service statuses i think we should able to update status right here, rather then on detailed form.
-20. [ ] phone place holder `+84...` as part of the config, Note `no onion, gate code, delivery code` as well
+20. [ ] phone place holder `+84...` as part of the config, Note `no onion, gate code, delivery code` as well (ui left)
 21. [x] Preserve customer form values between orders instead of resetting name/phone every time.
 22. [x] Add Telegram-native confirm/alert UX for cancel and submit failures.
 23. [x] Add booking status emphasis and maybe a compact timeline/receipt view.
-24. [ ] Then, if needed, split checkout and bookings into smaller components so this screen stops growing into a monolith.
-25. [ ] reorder booking
-26. [ ] recent order status is not updated
-27. [ ] if phone or name are not filled, show a warning
-28. [ ] new angular admin panel [doc](https://github.com/solairerove/yoobu-docs/blob/master/admin-panel-rnd.md)
-29. [ ] Motion polish Subtle transitions for card selection, cart-bar updates, tab switching, and checkout opening. Small enough to stay Telegram-friendly, but enough to make the UI feel deliberate. 
+24. [x] Then, if needed, split checkout and bookings into smaller components so this screen stops growing into a monolith.
+25. [ ] UI reorder booking
+26. [ ] UI recent order status is not updated
+27. [ ] UI if phone or name are not filled, show a warning
+28. [ ] ~~new angular admin panel [doc](https://github.com/solairerove/yoobu-docs/blob/master/admin-panel-rnd.md)~~
+29. [ ] UI Motion polish Subtle transitions for card selection, cart-bar updates, tab switching, and checkout opening. Small enough to stay Telegram-friendly, but enough to make the UI feel deliberate. 
 30. [x] Quantity control refinement The + / - controls work, but they still look a bit generic. Better pressed/active states and slightly tighter visual balance would improve the whole menu. 
 31. [x] Cleaner menu copy There are still a few lines that read like product-demo text rather than a real app. Tightening those would make the UI feel more production-ready. 
-32. [ ] Theme consistency pass Some surfaces still mix similar whites and borders. A pass to unify surface contrast, shadows, and accent usage would make the whole app feel more cohesive.
+32. [ ] UI Theme consistency pass Some surfaces still mix similar whites and borders. A pass to unify surface contrast, shadows, and accent usage would make the whole app feel more cohesive.
 33. [x] booking status can be changed from done to new
-34. [ ] List pages need workflow scaling improvements. bookings.html, services.html, and tenants.html have no search/pagination and show raw timestamps, so usability will degrade as data grows.
-35. [ ] Mobile table UX is hard to scan. admin-panel.css hides table headers and converts cells to blocks, but rows don’t add per-cell labels, so column meaning is lost on phone.
+34. [x] List pages need workflow scaling improvements. bookings.html, services.html, and tenants.html have no search/pagination and show raw timestamps, so usability will degrade as data grows.
+35. [ ] ADMIN ~~Mobile table UX is hard to scan. admin-panel.css hides table headers and converts cells to blocks, but rows don’t add per-cell labels, so column meaning is lost on phone.~~
 36. [x] sensitive data is exposed, bot token
-37. [ ] Format timestamps and monetary values for readability (local timezone, stable currency format) instead of raw values in tables/detail pages.
-38. [ ] Add flash feedback for service/tenant create/edit/delete flows too (we only added this for booking status), so operators always get explicit success/error outcomes.
-39. [ ] Add stronger destructive-action guards for service delete (for example typed confirmation), not only browser confirm() in service-form.html.
+37. [ ] ADMIN Format timestamps and monetary values for readability (local timezone, stable currency format) instead of raw values in tables/detail pages.
+38. [x] ADMIN Add flash feedback for service/tenant create/edit/delete flows too (we only added this for booking status), so operators always get explicit success/error outcomes.
+39. [x] ADMIN Add stronger destructive-action guards for service delete (for example typed confirmation), not only browser confirm() in service-form.html.
 40. [ ] Add business validation for booking status consistency in public APIs too (for example clear behavior if admin tries to modify cancelled/completed bookings via API race conditions).
-41. [ ] Add an admin-facing audit log screen (you already log everything), so superadmin can inspect who changed status/config and when.
+41. [ ] ADMIN Add an admin-facing audit log screen (you already log everything), so superadmin can inspect who changed status/config and when.
+42. [ ] pagination/sorting but for API REST admin endpoints too.
+43. [ ] pagination/sorting but for API REST public endpoints too.
