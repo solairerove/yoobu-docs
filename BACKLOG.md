@@ -18,7 +18,7 @@ This document tracks product and engineering ideas to consider outside of Jira.
 12. [x] tenant crud by superadmin
 13. [x] audits
 14. [x] show tenants with active not active statuses on superadmin page
-15. [ ] pagination on superadmin page?
+15. [ ] Add search/sort/pagination for bookings, services, and tenants lists. Right now they render full tables only, so operations degrade as data grows: bookings.html, services.html, tenants.html.
 16. [ ] aop for auditing
 17. [x] superadmin should be able to activate/deactivate services?
 18. [x] on admin panel there should be a confirmation dialog for deleting a service
@@ -34,5 +34,14 @@ This document tracks product and engineering ideas to consider outside of Jira.
 28. [ ] new angular admin panel [doc](https://github.com/solairerove/yoobu-docs/blob/master/admin-panel-rnd.md)
 29. [ ] Motion polish Subtle transitions for card selection, cart-bar updates, tab switching, and checkout opening. Small enough to stay Telegram-friendly, but enough to make the UI feel deliberate. 
 30. [x] Quantity control refinement The + / - controls work, but they still look a bit generic. Better pressed/active states and slightly tighter visual balance would improve the whole menu. 
-31. [ ] Cleaner menu copy There are still a few lines that read like product-demo text rather than a real app. Tightening those would make the UI feel more production-ready. 
+31. [x] Cleaner menu copy There are still a few lines that read like product-demo text rather than a real app. Tightening those would make the UI feel more production-ready. 
 32. [ ] Theme consistency pass Some surfaces still mix similar whites and borders. A pass to unify surface contrast, shadows, and accent usage would make the whole app feel more cohesive.
+33. [x] booking status can be changed from done to new
+34. [ ] List pages need workflow scaling improvements. bookings.html, services.html, and tenants.html have no search/pagination and show raw timestamps, so usability will degrade as data grows.
+35. [ ] Mobile table UX is hard to scan. admin-panel.css hides table headers and converts cells to blocks, but rows don’t add per-cell labels, so column meaning is lost on phone.
+36. [x] sensitive data is exposed, bot token
+37. [ ] Format timestamps and monetary values for readability (local timezone, stable currency format) instead of raw values in tables/detail pages.
+38. [ ] Add flash feedback for service/tenant create/edit/delete flows too (we only added this for booking status), so operators always get explicit success/error outcomes.
+39. [ ] Add stronger destructive-action guards for service delete (for example typed confirmation), not only browser confirm() in service-form.html.
+40. [ ] Add business validation for booking status consistency in public APIs too (for example clear behavior if admin tries to modify cancelled/completed bookings via API race conditions).
+41. [ ] Add an admin-facing audit log screen (you already log everything), so superadmin can inspect who changed status/config and when.
