@@ -33,6 +33,6 @@ This document tracks product and engineering ideas to consider outside of Jira.
 27. [ ] if phone or name are not filled, show a warning
 28. [ ] new angular admin panel [doc](https://github.com/solairerove/yoobu-docs/blob/master/admin-panel-rnd.md)
 29. [ ] Motion polish Subtle transitions for card selection, cart-bar updates, tab switching, and checkout opening. Small enough to stay Telegram-friendly, but enough to make the UI feel deliberate. 
-30. [ ] Quantity control refinement The + / - controls work, but they still look a bit generic. Better pressed/active states and slightly tighter visual balance would improve the whole menu. 
+30. [x] Quantity control refinement The + / - controls work, but they still look a bit generic. Better pressed/active states and slightly tighter visual balance would improve the whole menu. 
 31. [ ] Cleaner menu copy There are still a few lines that read like product-demo text rather than a real app. Tightening those would make the UI feel more production-ready. 
 32. [ ] Theme consistency pass Some surfaces still mix similar whites and borders. A pass to unify surface contrast, shadows, and accent usage would make the whole app feel more cohesive.
