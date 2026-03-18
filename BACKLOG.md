@@ -47,3 +47,9 @@ This document tracks product and engineering ideas to consider outside of Jira.
 41. [ ] ADMIN Add an admin-facing audit log screen (you already log everything), so superadmin can inspect who changed status/config and when.
 42. [ ] pagination/sorting but for API REST admin endpoints too.
 43. [ ] pagination/sorting but for API REST public endpoints too.
+44. [ ] ADMIN Нормальные поля времени в фильтре (не raw ISO text), чтобы не ошибаться руками. 
+45. [ ] ADMIN Локализация/человекочитаемые лейблы для entity/action (booking -> Заказы, UPDATE_STATUS -> Изменение статуса). 
+46. [ ] ADMIN Аккуратный diff-view: показывать только измененные ключи вместо обрезанного JSON. 
+47. [ ] ADMIN Базовый “safety cap”: ограничить size например до 50 в UI. 
+48. [ ] ADMIN Экспорт текущей выборки в CSV (очень полезно для разборов инцидентов). 
+49. [ ] ADMIN Индекс под новые фильтры, если аудит быстро растет (created_at, action, возможно составной).
