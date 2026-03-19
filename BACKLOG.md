@@ -43,7 +43,7 @@ This document tracks product and engineering ideas to consider outside of Jira.
 37. [ ] ADMIN Format timestamps and monetary values for readability (local timezone, stable currency format) instead of raw values in tables/detail pages.
 38. [x] ADMIN Add flash feedback for service/tenant create/edit/delete flows too (we only added this for booking status), so operators always get explicit success/error outcomes.
 39. [x] ADMIN Add stronger destructive-action guards for service delete (for example typed confirmation), not only browser confirm() in service-form.html.
-40. [ ] Add business validation for booking status consistency in public APIs too (for example clear behavior if admin tries to modify cancelled/completed bookings via API race conditions).
+40. [x] Add business validation for booking status consistency in public APIs too (for example clear behavior if admin tries to modify cancelled/completed bookings via API race conditions).
 41. [ ] ADMIN Add an admin-facing audit log screen (you already log everything), so superadmin can inspect who changed status/config and when.
 42. [ ] pagination/sorting but for API REST admin endpoints too.
 43. [ ] pagination/sorting but for API REST public endpoints too.
@@ -51,6 +51,11 @@ This document tracks product and engineering ideas to consider outside of Jira.
 45. [x] ADMIN Локализация/человекочитаемые лейблы для entity/action (booking -> Заказы, UPDATE_STATUS -> Изменение статуса). 
 46. [x] ADMIN Аккуратный diff-view: показывать только измененные ключи вместо обрезанного JSON. 
 47. [x] ADMIN Базовый “safety cap”: ограничить size например до 50 в UI. 
-48. [ ] ADMIN Экспорт текущей выборки в CSV (очень полезно для разборов инцидентов). 
-49. [ ] ADMIN Индекс под новые фильтры, если аудит быстро растет (created_at, action, возможно составной).
-50. [ ] UI вынести еще пару общих UI-стилей (.eyebrow, .ghost-button) в общие стили, чтобы уменьшить дублирование между компонентами.
+48. [x] ADMIN Экспорт текущей выборки в CSV (очень полезно для разборов инцидентов). 
+49. [x] ADMIN Индекс под новые фильтры, если аудит быстро растет (created_at, action, возможно составной).
+50. [x] UI вынести еще пару общих UI-стилей (.eyebrow, .ghost-button) в общие стили, чтобы уменьшить дублирование между компонентами.
+51. [ ] UI Route + tenant bootstrap tests for tenant-shell.component.ts: slug changes, config load error fallback, and applyTheme side effects.
+52. [ ] UI HTTP auth-header tests for telegram-init-data.interceptor.ts: init-data header vs localhost dev-user header vs no header.
+53. [ ] UI Telegram service behavior tests for telegram.service.ts: fallback paths (alert/confirm), main-button enable/disable, handler attach/detach cleanup.
+54. [ ] UI UI integration tests for food-order-home.component.ts: menu/orders switch, cart bar visibility, checkout open/close wiring.
+55. [ ] Presentational component interaction tests for food-order-bookings.component.ts and food-order-checkout.component.ts: emitted outputs and disabled/loading states.
