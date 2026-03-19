@@ -61,3 +61,4 @@ This document tracks product and engineering ideas to consider outside of Jira.
 55. [x] Presentational component interaction tests for food-order-bookings.component.ts and food-order-checkout.component.ts: emitted outputs and disabled/loading states.
 56. [x] Currency as part of the tenant config and it should be visible in the admin panel and in the public API for ui.
 57. [ ] geolocation for delivery address.
+58. [ ] изменение валюты работает, но куренси должна стать частью ордер айтема. чтобы именение валюты не влияло на существующие и созданные товары
