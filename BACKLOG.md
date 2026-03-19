@@ -23,7 +23,7 @@ This document tracks product and engineering ideas to consider outside of Jira.
 17. [x] superadmin should be able to activate/deactivate services?
 18. [x] on admin panel there should be a confirmation dialog for deleting a service
 19. [x] on admin panel for booking and service statuses i think we should able to update status right here, rather then on detailed form.
-20. [ ] phone place holder `+84...` as part of the config, Note `no onion, gate code, delivery code` as well (ui left)
+20. [x] phone place holder `+84...` as part of the config, Note `no onion, gate code, delivery code` as well (ui left)
 21. [x] Preserve customer form values between orders instead of resetting name/phone every time.
 22. [x] Add Telegram-native confirm/alert UX for cancel and submit failures.
 23. [x] Add booking status emphasis and maybe a compact timeline/receipt view.
@@ -32,19 +32,19 @@ This document tracks product and engineering ideas to consider outside of Jira.
 26. [ ] UI recent order status is not updated
 27. [ ] UI if phone or name are not filled, show a warning
 28. [ ] ~~new angular admin panel [doc](https://github.com/solairerove/yoobu-docs/blob/master/admin-panel-rnd.md)~~
-29. [ ] UI Motion polish Subtle transitions for card selection, cart-bar updates, tab switching, and checkout opening. Small enough to stay Telegram-friendly, but enough to make the UI feel deliberate. 
+29. [x] UI Motion polish Subtle transitions for card selection, cart-bar updates, tab switching, and checkout opening. Small enough to stay Telegram-friendly, but enough to make the UI feel deliberate. 
 30. [x] Quantity control refinement The + / - controls work, but they still look a bit generic. Better pressed/active states and slightly tighter visual balance would improve the whole menu. 
 31. [x] Cleaner menu copy There are still a few lines that read like product-demo text rather than a real app. Tightening those would make the UI feel more production-ready. 
-32. [ ] UI Theme consistency pass Some surfaces still mix similar whites and borders. A pass to unify surface contrast, shadows, and accent usage would make the whole app feel more cohesive.
+32. [x] UI Theme consistency pass Some surfaces still mix similar whites and borders. A pass to unify surface contrast, shadows, and accent usage would make the whole app feel more cohesive.
 33. [x] booking status can be changed from done to new
 34. [x] List pages need workflow scaling improvements. bookings.html, services.html, and tenants.html have no search/pagination and show raw timestamps, so usability will degrade as data grows.
 35. [ ] ADMIN ~~Mobile table UX is hard to scan. admin-panel.css hides table headers and converts cells to blocks, but rows don’t add per-cell labels, so column meaning is lost on phone.~~
 36. [x] sensitive data is exposed, bot token
-37. [ ] ADMIN Format timestamps and monetary values for readability (local timezone, stable currency format) instead of raw values in tables/detail pages.
+37. [x] ADMIN Format timestamps and monetary values for readability (local timezone, stable currency format) instead of raw values in tables/detail pages.
 38. [x] ADMIN Add flash feedback for service/tenant create/edit/delete flows too (we only added this for booking status), so operators always get explicit success/error outcomes.
 39. [x] ADMIN Add stronger destructive-action guards for service delete (for example typed confirmation), not only browser confirm() in service-form.html.
 40. [x] Add business validation for booking status consistency in public APIs too (for example clear behavior if admin tries to modify cancelled/completed bookings via API race conditions).
-41. [ ] ADMIN Add an admin-facing audit log screen (you already log everything), so superadmin can inspect who changed status/config and when.
+41. [x] ADMIN Add an admin-facing audit log screen (you already log everything), so superadmin can inspect who changed status/config and when.
 42. [ ] pagination/sorting but for API REST admin endpoints too.
 43. [ ] pagination/sorting but for API REST public endpoints too.
 44. [x] ADMIN Нормальные поля времени в фильтре (не raw ISO text), чтобы не ошибаться руками. 
@@ -54,8 +54,10 @@ This document tracks product and engineering ideas to consider outside of Jira.
 48. [x] ADMIN Экспорт текущей выборки в CSV (очень полезно для разборов инцидентов). 
 49. [x] ADMIN Индекс под новые фильтры, если аудит быстро растет (created_at, action, возможно составной).
 50. [x] UI вынести еще пару общих UI-стилей (.eyebrow, .ghost-button) в общие стили, чтобы уменьшить дублирование между компонентами.
-51. [ ] UI Route + tenant bootstrap tests for tenant-shell.component.ts: slug changes, config load error fallback, and applyTheme side effects.
-52. [ ] UI HTTP auth-header tests for telegram-init-data.interceptor.ts: init-data header vs localhost dev-user header vs no header.
-53. [ ] UI Telegram service behavior tests for telegram.service.ts: fallback paths (alert/confirm), main-button enable/disable, handler attach/detach cleanup.
-54. [ ] UI UI integration tests for food-order-home.component.ts: menu/orders switch, cart bar visibility, checkout open/close wiring.
-55. [ ] Presentational component interaction tests for food-order-bookings.component.ts and food-order-checkout.component.ts: emitted outputs and disabled/loading states.
+51. [x] UI Route + tenant bootstrap tests for tenant-shell.component.ts: slug changes, config load error fallback, and applyTheme side effects.
+52. [x] UI HTTP auth-header tests for telegram-init-data.interceptor.ts: init-data header vs localhost dev-user header vs no header.
+53. [x] UI Telegram service behavior tests for telegram.service.ts: fallback paths (alert/confirm), main-button enable/disable, handler attach/detach cleanup.
+54. [x] UI UI integration tests for food-order-home.component.ts: menu/orders switch, cart bar visibility, checkout open/close wiring.
+55. [x] Presentational component interaction tests for food-order-bookings.component.ts and food-order-checkout.component.ts: emitted outputs and disabled/loading states.
+56. [x] Currency as part of the tenant config and it should be visible in the admin panel and in the public API for ui.
+57. [ ] geolocation for delivery address.
