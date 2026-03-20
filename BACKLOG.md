@@ -68,3 +68,8 @@ This document tracks product and engineering ideas to consider outside of Jira.
 62. [ ] UI Medium: FoodOrderFlowFacade mixes orchestration, API lifecycle, formatting, draft hydration, and UI-side effects in one class (498 lines). Extract pure helpers (request mapping, date/currency formatting, customer draft policy) and isolate effect-heavy Telegram button logic for easier testability in food-order-flow.facade.ts.
 63. [ ] UI Medium: Missing tests around important state transitions: tenant switch resets, “bookings fetch failure + recovery”, and first-order hydration from latest booking. Current coverage is solid for submit/cancel but still leaves these regression gaps
 64. [x] simple text field for delivery address
+65. [x] simple qr payment flow, with qr code as just link to qr code page
+66. [ ] перенести настройки для админа в отдельную страницу под админом. сейчас только супер админ может настроить конфиги для тенанта. тенант тоже должен что-то иметь.
+67. [ ] подгружать адрес с предыдущего заказа тоже
+68. [ ] cancel confirmed order transitions, is it needed?
+69. [ ] reorder order
