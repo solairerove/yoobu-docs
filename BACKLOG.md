@@ -61,5 +61,9 @@ This document tracks product and engineering ideas to consider outside of Jira.
 55. [x] Presentational component interaction tests for food-order-bookings.component.ts and food-order-checkout.component.ts: emitted outputs and disabled/loading states.
 56. [x] Currency as part of the tenant config and it should be visible in the admin panel and in the public API for ui.
 57. [ ] geolocation for delivery address.
-58. [ ] изменение валюты работает, но куренси должна стать частью ордер айтема. чтобы именение валюты не влияло на существующие и созданные товары
+58. [x] изменение валюты работает, но куренси должна стать частью ордер айтема. чтобы именение валюты не влияло на существующие и созданные товары
 59. [x] убрать ид сервиса из каталога, потому что не дает никакой инфы
+60. [ ] UI High: Orders view rendering was incorrectly coupled to menu-loading state, so users could be blocked from seeing “My orders” while menu data was loading. I fixed this in food-order-home.component.ts and added regression coverage in food-order-home.component.spec.ts.
+61. [ ] UI Medium: FoodOrderHomeComponent is too large for maintainability (758 lines, inline template/styles/class wrappers), making decomposition and readability harder. Start by splitting “menu”, “cart bar”, and “success card” into presentational children in food-order-home.component.ts.
+62. [ ] UI Medium: FoodOrderFlowFacade mixes orchestration, API lifecycle, formatting, draft hydration, and UI-side effects in one class (498 lines). Extract pure helpers (request mapping, date/currency formatting, customer draft policy) and isolate effect-heavy Telegram button logic for easier testability in food-order-flow.facade.ts.
+63. [ ] UI Medium: Missing tests around important state transitions: tenant switch resets, “bookings fetch failure + recovery”, and first-order hydration from latest booking. Current coverage is solid for submit/cancel but still leaves these regression gaps
