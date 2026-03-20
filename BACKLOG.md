@@ -74,3 +74,5 @@ This document tracks product and engineering ideas to consider outside of Jira.
 68. [ ] cancel confirmed order transitions, is it needed?
 69. [ ] reorder order
 70. [ ] если отменить отмененный заказ
+71. [ ] UI checkout delivery date выходит за границы и окно это плавает
+72. [ ] UI order history, поменять местами текущий заказ и предыдущие заказы. текущий заказ наверх
