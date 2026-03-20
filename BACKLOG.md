@@ -28,9 +28,9 @@ This document tracks product and engineering ideas to consider outside of Jira.
 22. [x] Add Telegram-native confirm/alert UX for cancel and submit failures.
 23. [x] Add booking status emphasis and maybe a compact timeline/receipt view.
 24. [x] Then, if needed, split checkout and bookings into smaller components so this screen stops growing into a monolith.
-25. [ ] UI reorder booking
-26. [ ] UI recent order status is not updated
-27. [ ] UI if phone or name are not filled, show a warning
+25. [ ] ~~UI reorder booking~~
+26. [x] UI recent order status is not updated
+27. [x] UI if phone or name are not filled, show a warning
 28. [ ] ~~new angular admin panel [doc](https://github.com/solairerove/yoobu-docs/blob/master/admin-panel-rnd.md)~~
 29. [x] UI Motion polish Subtle transitions for card selection, cart-bar updates, tab switching, and checkout opening. Small enough to stay Telegram-friendly, but enough to make the UI feel deliberate. 
 30. [x] Quantity control refinement The + / - controls work, but they still look a bit generic. Better pressed/active states and slightly tighter visual balance would improve the whole menu. 
@@ -70,9 +70,11 @@ This document tracks product and engineering ideas to consider outside of Jira.
 64. [x] simple text field for delivery address
 65. [x] simple qr payment flow, with qr code as just link to qr code page
 66. [ ] перенести настройки для админа в отдельную страницу под админом. сейчас только супер админ может настроить конфиги для тенанта. тенант тоже должен что-то иметь.
-67. [ ] подгружать адрес с предыдущего заказа тоже
-68. [ ] cancel confirmed order transitions, is it needed?
-69. [ ] reorder order
-70. [ ] если отменить отмененный заказ
-71. [ ] UI checkout delivery date выходит за границы и окно это плавает
-72. [ ] UI order history, поменять местами текущий заказ и предыдущие заказы. текущий заказ наверх
+67. [x] подгружать адрес с предыдущего заказа тоже
+68. [ ] ~~cancel confirmed order transitions, is it needed?~~
+69. [x] reorder order
+70. [x] если отменить отмененный заказ
+71. [x] UI checkout delivery date выходит за границы и окно это плавает
+72. [x] UI order history, поменять местами текущий заказ и предыдущие заказы. текущий заказ наверх
+73. [ ] уменьшить карточки товаров
+74. [ ] добавить картинки? но это тут пиздец будет.
