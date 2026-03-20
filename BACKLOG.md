@@ -73,3 +73,4 @@ This document tracks product and engineering ideas to consider outside of Jira.
 67. [ ] подгружать адрес с предыдущего заказа тоже
 68. [ ] cancel confirmed order transitions, is it needed?
 69. [ ] reorder order
+70. [ ] если отменить отмененный заказ
