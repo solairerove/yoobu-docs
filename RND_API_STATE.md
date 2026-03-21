@@ -1,399 +1,486 @@
-# yoobu-api — Actual API State
-Generated from source code on: 2026-03-14
+# RND API State (Source-Derived Snapshot)
 
-## Endpoints
+Scope: `src/main/java`, `src/main/resources/db/migration`, `src/main/resources/application.yml`, `src/test/java`.  
+Excluded: existing docs/README.
 
-### Client API (/t/{slug}/...)
+## 1) Endpoints
 
-| Method | Path | Request Body | Response Body | Auth | Notes |
-|--------|------|-------------|---------------|------|-------|
-| GET | `/t/{slug}/config` | — | `TenantConfigResponse` | none | `TenantContextFilter` resolves active tenant by `slug`; 404 if tenant inactive or missing. |
-| GET | `/t/{slug}/services` | — | `List<ServiceResponse>` | none | Returns services with `status = ACTIVE` for current tenant. |
-| POST | `/t/{slug}/bookings` | `CreateBookingRequest` | `BookingResponse` | Telegram user required | `@TelegramPrincipal` resolved from `X-Telegram-Init-Data`; in `dev` profile also accepts `X-Telegram-User-Id`. Flow only supports tenants with `TenantType.FOOD_ORDER`; created `Booking.type` is always `ORDER`. |
-| GET | `/t/{slug}/bookings/my` | — | `List<BookingResponse>` | Telegram user required | Returns only bookings for current tenant and current Telegram user. Food-order tenants only. |
-| GET | `/t/{slug}/bookings/{bookingId}` | — | `BookingResponse` | Telegram user required | Returns only caller's own booking inside current tenant. Food-order tenants only. |
-| POST | `/t/{slug}/bookings/{bookingId}/cancel` | — | `BookingResponse` | Telegram user required | Changes status to `CANCELLED`; returns 409 if current status is `DONE`. Food-order tenants only. |
+### Client API (`/t/{slug}/...`)
 
-### Admin API (/admin/{slug}/...)
+| Controller.method | HTTP | Full path | Query params | Request body/form | Response | Auth | Behavioral notes |
+|---|---|---|---|---|---|---|---|
+| `CatalogController.getServices` | `GET` | `/t/{slug}/services` | none | none | `200` + `List<ServiceResponse>` | none | Tenant resolved by `TenantContextFilter`; if slug missing: `400 Tenant slug is missing`; unknown/inactive tenant: `404 Tenant not found`. Returns only `ServiceStatus.ACTIVE`. |
+| `TenantPublicController.getConfig` | `GET` | `/t/{slug}/config` | none | none | `200` + `TenantConfigResponse` | none | Same tenant resolution behavior as above. |
+| `BookingController.createBooking` | `POST` | `/t/{slug}/bookings` | none | `@Valid CreateBookingRequest` | `200` + `BookingResponse` | Telegram | Telegram principal from `TelegramUserArgumentResolver` (`X-Telegram-Init-Data`, or dev-only `X-Telegram-User-Id`). Validation errors -> `400`. Business errors include: `400 Tenant does not support food ordering`, `400 Delivery date must be on or after ...`, `400 Service not found`, `400 Service price is missing`. |
+| `BookingController.getMyBookings` | `GET` | `/t/{slug}/bookings/my` | none | none | `200` + `List<BookingResponse>` | Telegram | Returns bookings for `(tenantId, telegramUserId)` only. Unauthorized Telegram headers -> `401 Invalid initData`. |
+| `BookingController.getBooking` | `GET` | `/t/{slug}/bookings/{bookingId}` | none | none | `200` + `BookingResponse` | Telegram | Not owned/missing booking -> `404 Booking not found`. |
+| `BookingController.cancelBooking` | `POST` | `/t/{slug}/bookings/{bookingId}/cancel` | none | none | `200` + `BookingResponse` | Telegram | `DONE` booking cancel -> `409 Completed booking cannot be cancelled`; not owned/missing -> `404 Booking not found`. |
+| `BookingController.confirmPayment` | `POST` | `/t/{slug}/bookings/{bookingId}/confirm-payment` | none | none | `200` + `BookingResponse` | Telegram | Allowed only from `NEW` -> status moves to `PAYMENT_PENDING`; otherwise `409 Payment can only be confirmed for booking in NEW status`; not owned/missing -> `404 Booking not found`. |
 
-| Method | Path | Request Body | Response Body | Auth | Notes |
-|--------|------|-------------|---------------|------|-------|
-| GET | `/admin/{slug}/services` | — | `List<ServiceResponse>` | HTTP Basic | Tenant admin credentials from `tenant_config` (`admin_username`, `admin_password`) or superadmin credentials. Food-order tenants only. |
-| POST | `/admin/{slug}/services` | `AdminUpsertServiceRequest` | `ServiceResponse` | HTTP Basic | Returns `201 Created`. If request `status` is null, service status becomes `ACTIVE`. Food-order tenants only. |
-| PUT | `/admin/{slug}/services/{serviceId}` | `AdminUpsertServiceRequest` | `ServiceResponse` | HTTP Basic | Rejects `status = DELETED` with 400; delete must use delete endpoint. Food-order tenants only. |
-| DELETE | `/admin/{slug}/services/{serviceId}` | — | — | HTTP Basic | Returns `204 No Content`. Soft-delete: sets `status = DELETED`, `deleted_at`, `updated_at`. Food-order tenants only. |
-| GET | `/admin/{slug}/bookings` | — | `List<BookingResponse>` | HTTP Basic | Optional query params: `status` (`BookingStatus`), `deliveryDate` (`ISO date`). Food-order tenants only. |
-| GET | `/admin/{slug}/bookings/{bookingId}` | — | `BookingResponse` | HTTP Basic | Food-order tenants only. |
-| PUT | `/admin/{slug}/bookings/{bookingId}/status` | `UpdateStatusRequest` | `BookingResponse` | HTTP Basic | Updates booking status without transition validation. Food-order tenants only. |
-| GET | `/admin/{slug}/panel` | — | redirect string | HTTP Basic | MVC controller; redirects to `/admin/{slug}/panel/bookings`. |
-| GET | `/admin/{slug}/panel/bookings` | — | HTML view `admin/panel/bookings` | HTTP Basic | Query params: `status`, `deliveryDate`. Model includes `bookings`, `selectedStatus`, `deliveryDate`, `statuses`. |
-| GET | `/admin/{slug}/panel/bookings/{bookingId}` | — | HTML view `admin/panel/booking-detail` | HTTP Basic | Model includes `booking`, `statuses`, `statusForm`. |
-| POST | `/admin/{slug}/panel/bookings/{bookingId}/status` | form params -> `BookingStatusForm` | redirect string or HTML view | HTTP Basic | `@ModelAttribute("statusForm")`; on validation error re-renders detail view. |
-| GET | `/admin/{slug}/panel/services` | — | HTML view `admin/panel/services` | HTTP Basic | Model includes `services`. |
-| GET | `/admin/{slug}/panel/services/new` | — | HTML view `admin/panel/service-form` | HTTP Basic | Model includes default `ServiceForm` with `sortOrder = 0`, `status = ACTIVE`. |
-| POST | `/admin/{slug}/panel/services` | form params -> `ServiceForm` | redirect string or HTML view | HTTP Basic | On validation error re-renders form. Internally converted to `AdminUpsertServiceRequest`. |
-| GET | `/admin/{slug}/panel/services/{serviceId}/edit` | — | HTML view `admin/panel/service-form` | HTTP Basic | Loads existing service through `AdminCatalogService#getAdminService`. |
-| POST | `/admin/{slug}/panel/services/{serviceId}` | form params -> `ServiceForm` | redirect string or HTML view | HTTP Basic | On validation error re-renders form. |
-| POST | `/admin/{slug}/panel/services/{serviceId}/delete` | — | redirect string | HTTP Basic | Internally calls same soft-delete flow as REST delete. |
+### Admin API (`/admin/{slug}/...`)
 
-### Superadmin API (/superadmin/...)
+| Controller.method | HTTP | Full path | Query params | Request body/form | Response | Auth | Behavioral notes |
+|---|---|---|---|---|---|---|---|
+| `AdminCatalogController.getServices` | `GET` | `/admin/{slug}/services` | none | none | `200` + `List<ServiceResponse>` | HTTP Basic tenant | Tenant realm: `Yoobu Tenant Admin: {slug}`. Superadmin credentials are also accepted in this filter. Returns non-`DELETED` services. |
+| `AdminCatalogController.createService` | `POST` | `/admin/{slug}/services` | none | `@Valid AdminUpsertServiceRequest` | `201` + `ServiceResponse` | HTTP Basic tenant | Validation errors -> `400`. For non-food tenant -> `400 Tenant does not support food ordering`. |
+| `AdminCatalogController.updateService` | `PUT` | `/admin/{slug}/services/{serviceId}` | none | `@Valid AdminUpsertServiceRequest` | `200` + `ServiceResponse` | HTTP Basic tenant | Missing service -> `404 Service not found`; `status=DELETED` in upsert payload -> `400 Use delete endpoint to remove a service`. |
+| `AdminCatalogController.deleteService` | `DELETE` | `/admin/{slug}/services/{serviceId}` | none | none | `204` empty | HTTP Basic tenant | Soft-delete: sets status `DELETED`, `deletedAt`. Missing service -> `404 Service not found`. |
+| `AdminBookingController.getBookings` | `GET` | `/admin/{slug}/bookings` | `status` optional (`BookingStatus`), `deliveryDate` optional (`ISO date`) | none | `200` + `List<BookingResponse>` | HTTP Basic tenant | Non-food tenant -> `400 Tenant does not support food ordering`. |
+| `AdminBookingController.getBooking` | `GET` | `/admin/{slug}/bookings/{bookingId}` | none | none | `200` + `BookingResponse` | HTTP Basic tenant | Missing booking -> `404 Booking not found`. |
+| `AdminBookingController.updateStatus` | `PUT` | `/admin/{slug}/bookings/{bookingId}/status` | none | `@Valid UpdateStatusRequest` | `200` + `BookingResponse` | HTTP Basic tenant | Validation (`trackingUrl` max 2048) -> `400`. Invalid transition -> `409`. Invalid tracking URL/scheme/host -> `400`. Optimistic lock conflict -> `409 Booking was modified by another request. Refresh and retry.` |
+| `AdminPanelBookingController.panelHome` | `GET` | `/admin/{slug}/panel` and `/admin/{slug}/panel/` | none | none | redirect view (`redirect:/admin/{slug}/panel/bookings`) | HTTP Basic tenant | MVC redirect. |
+| `AdminPanelBookingController.bookings` | `GET` | `/admin/{slug}/panel/bookings` | `status?`, `deliveryDate?`, `page=0` default, `size=10` default | none | view `admin/panel/bookings` | HTTP Basic tenant | Populates paging + status options by booking. |
+| `AdminPanelBookingController.bookingDetail` | `GET` | `/admin/{slug}/panel/bookings/{bookingId}` | none | none | view `admin/panel/booking-detail` | HTTP Basic tenant | Missing booking propagates `404 Booking not found`. |
+| `AdminPanelBookingController.updateStatus` | `POST` | `/admin/{slug}/panel/bookings/{bookingId}/status` | `returnTo` default `list` (`detail` supported) | `@Valid @ModelAttribute BookingStatusForm` | redirect to list/detail | HTTP Basic tenant | Binding errors -> flash error and redirect; service `ResponseStatusException` reason surfaced as flash error. Success flash: `Booking #{id} status updated to ...`. |
+| `AdminPanelServiceController.services` | `GET` | `/admin/{slug}/panel/services` | `query?`, `page=0`, `size=20` | none | view `admin/panel/services` | HTTP Basic tenant | Uses paged admin service query and tenant currency. |
+| `AdminPanelServiceController.newService` | `GET` | `/admin/{slug}/panel/services/new` | none | none | view `admin/panel/service-form` | HTTP Basic tenant | Form defaults: `sortOrder=0`, `status=ACTIVE`. |
+| `AdminPanelServiceController.createService` | `POST` | `/admin/{slug}/panel/services` | none | `@Valid @ModelAttribute ServiceForm` | redirect `.../panel/services` or same form view on bind errors | HTTP Basic tenant | Service exception -> flash error + redirect. |
+| `AdminPanelServiceController.editService` | `GET` | `/admin/{slug}/panel/services/{serviceId}/edit` | none | none | view `admin/panel/service-form` | HTTP Basic tenant | Missing service -> `404 Service not found`. |
+| `AdminPanelServiceController.updateService` | `POST` | `/admin/{slug}/panel/services/{serviceId}` | none | `@Valid @ModelAttribute ServiceForm` | redirect `.../panel/services` or same form view on bind errors | HTTP Basic tenant | Service exception -> flash error + redirect. |
+| `AdminPanelServiceController.deleteService` | `POST` | `/admin/{slug}/panel/services/{serviceId}/delete` | `confirmName?` | form param only | redirect to list or edit page | HTTP Basic tenant | Requires exact typed name match; mismatch -> flash error. |
+| `AdminPanelServiceController.updateStatus` | `POST` | `/admin/{slug}/panel/services/{serviceId}/status` | none | `@Valid @ModelAttribute ServiceStatusForm` | redirect `.../panel/services` | HTTP Basic tenant | Binding errors -> flash error. Internally loads current service then performs full update with new status. |
 
-| Method | Path | Request Body | Response Body | Auth | Notes |
-|--------|------|-------------|---------------|------|-------|
-| GET | `/superadmin/tenants` | — | `List<TenantSummaryResponse>` | HTTP Basic | Uses custom superadmin basic auth filter with `app.superadmin.*`. |
-| GET | `/superadmin/tenants/{tenantId}` | — | `TenantDetailResponse` | HTTP Basic | 404 if tenant not found. |
-| GET | `/superadmin/tenants/slug-availability?slug=...` | — | `TenantSlugAvailabilityResponse` | HTTP Basic | Returns `available = false` for existing slug; blank slug becomes `false`. |
-| POST | `/superadmin/tenants` | `CreateTenantRequest` | `TenantSummaryResponse` | HTTP Basic | Returns 200. Creates tenant row and related `tenant_config` keys. |
-| PUT | `/superadmin/tenants/{tenantId}` | `UpdateTenantRequest` | `TenantSummaryResponse` | HTTP Basic | Slug is immutable through API; optional config values may be removed when blank. |
-| GET | `/superadmin/panel` | — | redirect string | HTTP Basic | MVC controller; redirects to `/superadmin/panel/tenants`. |
-| GET | `/superadmin/panel/tenants` | — | HTML view `superadmin/panel/tenants` | HTTP Basic | Model includes `tenants`. |
-| GET | `/superadmin/panel/tenants/{tenantId}` | — | HTML view `superadmin/panel/tenant-detail` | HTTP Basic | Model includes `tenant`. |
-| GET | `/superadmin/panel/tenants/new` | — | HTML view `superadmin/panel/tenant-form` | HTTP Basic | Model includes `tenantForm`, `tenantTypes`, `formMode=create`. |
-| POST | `/superadmin/panel/tenants` | form params -> `SuperAdminTenantForm` | redirect string or HTML view | HTTP Basic | Validates duplicate slug and non-blank `adminPassword` in controller in addition to bean validation. |
-| GET | `/superadmin/panel/tenants/{tenantId}/edit` | — | HTML view `superadmin/panel/tenant-form` | HTTP Basic | Populates form from `TenantDetailResponse`. |
-| POST | `/superadmin/panel/tenants/{tenantId}` | form params -> `SuperAdminTenantForm` | redirect string or HTML view | HTTP Basic | Internally converted to `UpdateTenantRequest`. |
+### Superadmin API (`/superadmin/...`)
 
-## DTOs
+| Controller.method | HTTP | Full path | Query params | Request body/form | Response | Auth | Behavioral notes |
+|---|---|---|---|---|---|---|---|
+| `SuperAdminTenantController.getTenants` | `GET` | `/superadmin/tenants` | none | none | `200` + `List<TenantSummaryResponse>` | HTTP Basic superadmin | Missing/invalid basic header -> `401` with realm `Yoobu Super Admin`. |
+| `SuperAdminTenantController.getTenant` | `GET` | `/superadmin/tenants/{tenantId}` | none | none | `200` + `TenantDetailResponse` | HTTP Basic superadmin | Missing tenant -> `404 Tenant not found`. |
+| `SuperAdminTenantController.getSlugAvailability` | `GET` | `/superadmin/tenants/slug-availability` | `slug` required | none | `200` + `TenantSlugAvailabilityResponse` | HTTP Basic superadmin | `available` false if slug exists or slug blank. |
+| `SuperAdminTenantController.createTenant` | `POST` | `/superadmin/tenants` | none | `@Valid CreateTenantRequest` | `200` + `TenantSummaryResponse` | HTTP Basic superadmin | Validation errors -> `400`; duplicate slug -> `409 Tenant slug already exists`; invalid payment QR -> `400 paymentQrUrl must be a valid absolute http(s) URL`. |
+| `SuperAdminTenantController.updateTenant` | `PUT` | `/superadmin/tenants/{tenantId}` | none | `@Valid UpdateTenantRequest` | `200` + `TenantSummaryResponse` | HTTP Basic superadmin | Missing tenant -> `404`; invalid payment QR -> `400`. |
+| `SuperAdminAuditController.getAuditLogs` | `GET` | `/superadmin/audit` | `tenantId?`, `entity?`, `action?`, `actorId?`, `createdFrom?` ISO datetime, `createdTo?` ISO datetime, `page=0`, `size=20` | none | `200` + `AuditLogPageResponse` | HTTP Basic superadmin | Size capped to 50 in service. |
+| `SuperAdminAuditController.exportAuditLogs` | `GET` | `/superadmin/audit/export` | same filters; `size=5000` | none | `200 text/csv` bytes | HTTP Basic superadmin | Size capped to 5000 in service; attachment filename `audit-log-YYYYMMDD-HHmmss.csv`. |
+| `SuperAdminPanelController.panelHome` | `GET` | `/superadmin/panel` and `/superadmin/panel/` | none | none | redirect `redirect:/superadmin/panel/tenants` | HTTP Basic superadmin | MVC redirect. |
+| `SuperAdminPanelController.tenants` | `GET` | `/superadmin/panel/tenants` | `query?`, `page=0`, `size=20` | none | view `superadmin/panel/tenants` | HTTP Basic superadmin | Paged tenant listing. |
+| `SuperAdminPanelController.audit` | `GET` | `/superadmin/panel/audit` | `tenantId?`, `entity?`, `action?`, `actorId?`, `createdFrom?`, `createdTo?`, `page=0`, `size=20` | none | view `superadmin/panel/audit` | HTTP Basic superadmin | Datetime parse supports both `OffsetDateTime.parse` and local datetime (interpreted as UTC). |
+| `SuperAdminPanelController.exportAudit` | `GET` | `/superadmin/panel/audit/export` | same filters; `size=5000` | none | `200 text/csv` bytes | HTTP Basic superadmin | Attachment response. |
+| `SuperAdminPanelController.tenantDetail` | `GET` | `/superadmin/panel/tenants/{tenantId}` | none | none | view `superadmin/panel/tenant-detail` | HTTP Basic superadmin | Missing tenant -> `404`. |
+| `SuperAdminPanelController.newTenant` | `GET` | `/superadmin/panel/tenants/new` | none | none | view `superadmin/panel/tenant-form` | HTTP Basic superadmin | Initializes empty `SuperAdminTenantForm`. |
+| `SuperAdminPanelController.createTenant` | `POST` | `/superadmin/panel/tenants` | none | `@Valid @ModelAttribute SuperAdminTenantForm` | redirect to tenants list or same form view | HTTP Basic superadmin | Extra create validations: adminPassword required, slug uniqueness check via service. |
+| `SuperAdminPanelController.editTenant` | `GET` | `/superadmin/panel/tenants/{tenantId}/edit` | none | none | view `superadmin/panel/tenant-form` | HTTP Basic superadmin | Loads values from `TenantDetailResponse.config`. |
+| `SuperAdminPanelController.updateTenant` | `POST` | `/superadmin/panel/tenants/{tenantId}` | none | `@Valid @ModelAttribute SuperAdminTenantForm` | redirect `.../tenants/{tenantId}` or same form view | HTTP Basic superadmin | Binding errors keep edit form; service errors set `formError`. |
 
-### BookingItemRequest
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `serviceId` | `Long` | `@NotNull` | — |
-| `quantity` | `int` | `@Min(1)` | — |
+### Unscoped endpoint
 
-### BookingItemResponse
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `serviceName` | `String` | — | — |
-| `quantity` | `int` | — | — |
-| `unitPrice` | `BigDecimal` | — | — |
+| Controller.method | HTTP | Full path | Auth | Notes |
+|---|---|---|---|---|
+| `HealthController.health` | `GET` | `/health` | none | Returns `{ "status": "ok" }`; handled by default security chain (`permitAll`). |
 
-### BookingResponse
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `id` | `Long` | — | — |
-| `type` | `BookingType` | — | — |
-| `status` | `BookingStatus` | — | — |
-| `customerName` | `String` | — | — |
-| `totalPrice` | `BigDecimal` | — | — |
-| `deliveryDate` | `LocalDate` | — | — |
-| `note` | `String` | — | — |
-| `items` | `List<BookingItemResponse>` | — | — |
-| `createdAt` | `OffsetDateTime` | — | — |
+## 2) DTOs / Form models
 
-### CreateBookingRequest
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `customerName` | `String` | `@NotBlank` | — |
-| `customerPhone` | `String` | `@NotBlank` | — |
-| `deliveryDate` | `LocalDate` | `@NotNull` | Also validated in service against tenant-local earliest allowed date. |
-| `note` | `String` | — | Optional. |
-| `items` | `List<BookingItemRequest>` | `@NotEmpty`, element `@Valid` | Each item validated through nested `BookingItemRequest`. |
+`Required` semantics below are from validation annotations and Java nullability/primitive types.
 
-### UpdateStatusRequest
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `status` | `BookingStatus` | `@NotNull` | — |
+| DTO / Form | Field | Java type | Validation / default | Required? | Used by endpoint(s) |
+|---|---|---|---|---|---|
+| `CreateBookingRequest` | `customerName` | `String` | `@NotBlank` | required | `BookingController.createBooking` |
+| `CreateBookingRequest` | `customerPhone` | `String` | `@NotBlank` | required | same |
+| `CreateBookingRequest` | `deliveryAddress` | `String` | `@NotBlank` | required | same |
+| `CreateBookingRequest` | `deliveryDate` | `LocalDate` | `@NotNull` | required | same |
+| `CreateBookingRequest` | `note` | `String` | none | nullable | same |
+| `CreateBookingRequest` | `items` | `List<BookingItemRequest>` | `@NotEmpty`, elements `@Valid` | required, non-empty | same |
+| `BookingItemRequest` | `serviceId` | `Long` | `@NotNull` | required | nested in `CreateBookingRequest` |
+| `BookingItemRequest` | `quantity` | `int` | `@Min(1)` | required (primitive) | nested in `CreateBookingRequest` |
+| `UpdateStatusRequest` | `status` | `BookingStatus` | `@NotNull` | required | `AdminBookingController.updateStatus` |
+| `UpdateStatusRequest` | `trackingUrl` | `String` | `@Size(max=2048)` | nullable | same |
+| `AdminUpsertServiceRequest` | `name` | `String` | `@NotBlank` | required | `AdminCatalogController.createService`, `updateService` |
+| `AdminUpsertServiceRequest` | `description` | `String` | none | nullable | same |
+| `AdminUpsertServiceRequest` | `price` | `BigDecimal` | `@NotNull` | required | same |
+| `AdminUpsertServiceRequest` | `unit` | `String` | none | nullable (`"шт"` fallback in service) | same |
+| `AdminUpsertServiceRequest` | `durationMinutes` | `Integer` | none | nullable | same |
+| `AdminUpsertServiceRequest` | `sortOrder` | `Integer` | none | nullable (`0` fallback in service) | same |
+| `AdminUpsertServiceRequest` | `status` | `ServiceStatus` | none | nullable (`ACTIVE` fallback; `DELETED` rejected) | same |
+| `CreateTenantRequest` | `slug` | `String` | `@NotBlank` | required | `SuperAdminTenantController.createTenant` |
+| `CreateTenantRequest` | `name` | `String` | `@NotBlank` | required | same |
+| `CreateTenantRequest` | `type` | `TenantType` | `@NotNull` | required | same |
+| `CreateTenantRequest` | `botToken` | `String` | none | nullable | same |
+| `CreateTenantRequest` | `ownerTelegramId` | `Long` | none | nullable | same |
+| `CreateTenantRequest` | `timezone` | `String` | none | nullable (`Asia/Ho_Chi_Minh` fallback) | same |
+| `CreateTenantRequest` | `currency` | `String` | none | nullable (`USD` fallback) | same |
+| `CreateTenantRequest` | `primaryColor`, `logoUrl`, `welcomeMessage`, `checkoutNameHint`, `checkoutPhoneHint`, `checkoutNoteHint`, `paymentQrUrl` | `String` | none (`paymentQrUrl` validated if present) | nullable | same |
+| `CreateTenantRequest` | `adminUsername` | `String` | `@NotBlank` | required | same |
+| `CreateTenantRequest` | `adminPassword` | `String` | `@NotBlank` | required | same |
+| `UpdateTenantRequest` | `name` | `String` | `@NotBlank` | required | `SuperAdminTenantController.updateTenant` |
+| `UpdateTenantRequest` | `type` | `TenantType` | `@NotNull` | required | same |
+| `UpdateTenantRequest` | `adminUsername` | `String` | `@NotBlank` | required | same |
+| `UpdateTenantRequest` | `active` | `Boolean` | `@NotNull` | required | same |
+| `UpdateTenantRequest` | other fields | mixed | none (`paymentQrUrl` validated if present) | nullable | same |
+| `ServiceForm` (MVC) | `name` | `String` | `@NotBlank` | required | `AdminPanelServiceController.createService`, `updateService` |
+| `ServiceForm` (MVC) | `price` | `BigDecimal` | `@NotNull` | required | same |
+| `ServiceForm` (MVC) | `status` | `ServiceStatus` | `@NotNull`, default `ACTIVE` | required with default | same |
+| `ServiceForm` (MVC) | `description`, `unit`, `durationMinutes`, `sortOrder` | mixed | none | nullable | same |
+| `ServiceStatusForm` (MVC) | `status` | `ServiceStatus` | `@NotNull` | required | `AdminPanelServiceController.updateStatus` |
+| `BookingStatusForm` (MVC) | `status` | `BookingStatus` | `@NotNull` | required | `AdminPanelBookingController.updateStatus` |
+| `BookingStatusForm` (MVC) | `trackingUrl` | `String` | `@Size(max=2048)` | nullable | same |
+| `SuperAdminTenantForm` (MVC) | `slug` | `String` | `@NotBlank` | required | `SuperAdminPanelController.createTenant` |
+| `SuperAdminTenantForm` (MVC) | `name` | `String` | `@NotBlank` | required | create/update forms |
+| `SuperAdminTenantForm` (MVC) | `type` | `TenantType` | `@NotNull`, default `FOOD_ORDER` | required with default | create/update forms |
+| `SuperAdminTenantForm` (MVC) | `timezone` | `String` | default `Asia/Ho_Chi_Minh` | optional input | create/update forms |
+| `SuperAdminTenantForm` (MVC) | `currency` | `String` | default `USD` | optional input | create/update forms |
+| `SuperAdminTenantForm` (MVC) | `adminUsername` | `String` | `@NotBlank` | required | create/update forms |
+| `SuperAdminTenantForm` (MVC) | `adminPassword` | `String` | none (create adds manual non-blank check) | optional on update, required on create | create/update forms |
+| `SuperAdminTenantForm` (MVC) | `active` | `boolean` | default `true` | always present as primitive/default | update form |
+| `TenantSummaryResponse` | all fields | record | no validation (output DTO) | n/a | superadmin tenant list/create/update responses |
+| `TenantDetailResponse` | all fields incl `config` map | record | output DTO | n/a | superadmin tenant detail response |
+| `TenantConfigResponse` | branding/checkout/payment fields | record | output DTO | n/a | `/t/{slug}/config` |
+| `TenantSlugAvailabilityResponse` | `slug`, `available` | record | output DTO | n/a | `/superadmin/tenants/slug-availability` |
+| `ServiceResponse` | service fields | record | output DTO | n/a | catalog/admin/service panel flows |
+| `BookingResponse` | booking aggregate fields | record | output DTO | n/a | client/admin booking endpoints |
+| `BookingItemResponse` | serviceName/quantity/unitPrice/currency | record | output DTO | n/a | nested inside `BookingResponse` |
+| `AuditLogItemResponse` | audit row projection | record | output DTO | n/a | `/superadmin/audit*`, panel audit |
+| `AuditLogPageResponse` | pagination wrapper | record | output DTO | n/a | `/superadmin/audit` |
 
-### AdminUpsertServiceRequest
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `name` | `String` | `@NotBlank` | — |
-| `description` | `String` | — | Optional. |
-| `price` | `BigDecimal` | `@NotNull` | — |
-| `unit` | `String` | — | Null/blank becomes `"шт"` in service layer. |
-| `durationMinutes` | `Integer` | — | Optional. |
-| `sortOrder` | `Integer` | — | Null becomes `0` in service layer. |
-| `status` | `ServiceStatus` | — | Null becomes `ACTIVE`; `DELETED` is rejected on create/update. |
+## 3) Entities
 
-### ServiceResponse
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `id` | `Long` | — | — |
-| `name` | `String` | — | — |
-| `description` | `String` | — | — |
-| `price` | `BigDecimal` | — | — |
-| `unit` | `String` | — | — |
-| `durationMinutes` | `Integer` | — | — |
-| `sortOrder` | `int` | — | — |
-| `status` | `ServiceStatus` | — | — |
+### `Tenant` (`tenant`)
 
-### CreateTenantRequest
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `slug` | `String` | `@NotBlank` | Stored as-is; uniqueness checked in service. |
-| `name` | `String` | `@NotBlank` | — |
-| `type` | `TenantType` | `@NotNull` | — |
-| `botToken` | `String` | — | Optional; blank trimmed to null. |
-| `ownerTelegramId` | `Long` | — | Optional. |
-| `timezone` | `String` | — | Blank/null normalized to `Asia/Ho_Chi_Minh`. |
-| `primaryColor` | `String` | — | Optional config key `primary_color`. |
-| `logoUrl` | `String` | — | Optional config key `logo_url`. |
-| `welcomeMessage` | `String` | — | Optional config key `welcome_message`. |
-| `adminUsername` | `String` | `@NotBlank` | Stored in `tenant_config.admin_username`. |
-| `adminPassword` | `String` | `@NotBlank` | BCrypt-hashed and stored in `tenant_config.admin_password`. |
+| Field | Java type | DB column/type | Nullability/default/constraints | Relationships | Used vs reserved |
+|---|---|---|---|---|---|
+| `id` | `Long` | `id BIGSERIAL` | PK | none | used |
+| `slug` | `String` | `slug VARCHAR(100)` | `NOT NULL`, `UNIQUE` | none | used in routing/auth |
+| `name` | `String` | `name VARCHAR(255)` | `NOT NULL` | none | used |
+| `type` | `TenantType` | `type VARCHAR(30)` | `NOT NULL` | none | used for flow gating |
+| `botToken` | `String` | `bot_token VARCHAR(255)` | nullable | none | used by Telegram validator |
+| `ownerTelegramId` | `Long` | `owner_telegram_id BIGINT` | nullable | none | stored/exposed only |
+| `timezone` | `String` | `timezone VARCHAR(50)` | `NOT NULL`, DB default `'Asia/Ho_Chi_Minh'` | none | used in tenant time formatting/logic |
+| `active` | `boolean` | `active BOOLEAN` | `NOT NULL`, DB default `TRUE` | none | used by `findBySlugAndActiveTrue` |
+| `createdAt` | `OffsetDateTime` | `created_at TIMESTAMPTZ` | `NOT NULL`, DB default `NOW()` | none | used for sorting/exposure |
 
-### UpdateTenantRequest
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `name` | `String` | `@NotBlank` | — |
-| `type` | `TenantType` | `@NotNull` | — |
-| `botToken` | `String` | — | Blank trimmed to null. |
-| `ownerTelegramId` | `Long` | — | Optional. |
-| `timezone` | `String` | — | Blank/null normalized to `Asia/Ho_Chi_Minh`. |
-| `primaryColor` | `String` | — | Blank removes config key. |
-| `logoUrl` | `String` | — | Blank removes config key. |
-| `welcomeMessage` | `String` | — | Blank removes config key. |
-| `adminUsername` | `String` | `@NotBlank` | Overwrites stored username. |
-| `adminPassword` | `String` | — | Blank keeps previous password hash. |
-| `active` | `Boolean` | `@NotNull` | `false` makes tenant inaccessible through `TenantContextFilter`. |
+### `TenantConfig` (`tenant_config`)
 
-### TenantConfigResponse
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `slug` | `String` | — | — |
-| `name` | `String` | — | — |
-| `type` | `TenantType` | — | — |
-| `primaryColor` | `String` | — | From config key `primary_color`. |
-| `logoUrl` | `String` | — | From config key `logo_url`. |
-| `welcomeMessage` | `String` | — | From config key `welcome_message`. |
+| Field | Java type | DB column/type | Nullability/default/constraints | Relationships | Used vs reserved |
+|---|---|---|---|---|---|
+| `id` | `Long` | `id BIGSERIAL` | PK | none | used |
+| `tenant` | `Tenant` | `tenant_id BIGINT` | `NOT NULL`, FK `tenant(id)` | `@ManyToOne(fetch = LAZY, optional = false)` | used |
+| `key` | `String` | `key VARCHAR(100)` | `NOT NULL`, unique with tenant at DB (`UNIQUE (tenant_id,key)`) | none | used |
+| `value` | `String` | `value TEXT` | nullable | none | used |
 
-### TenantDetailResponse
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `id` | `Long` | — | — |
-| `slug` | `String` | — | — |
-| `name` | `String` | — | — |
-| `type` | `TenantType` | — | — |
-| `active` | `boolean` | — | — |
-| `timezone` | `String` | — | — |
-| `botToken` | `String` | — | Optional. |
-| `ownerTelegramId` | `Long` | — | Optional. |
-| `createdAt` | `OffsetDateTime` | — | — |
-| `config` | `Map<String, String>` | — | Includes stored config entries such as `admin_username`, `primary_color`, `logo_url`, `welcome_message`. |
+### `CatalogService` (`service`)
 
-### TenantSlugAvailabilityResponse
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `slug` | `String` | — | — |
-| `available` | `boolean` | — | — |
+| Field | Java type | DB column/type | Nullability/default/constraints | Relationships | Used vs reserved |
+|---|---|---|---|---|---|
+| `id` | `Long` | `id BIGSERIAL` | PK | none | used |
+| `tenant` | `Tenant` | `tenant_id BIGINT` | `NOT NULL`, FK `tenant(id)` | `@ManyToOne(fetch = LAZY, optional = false)` | used |
+| `name` | `String` | `name VARCHAR(255)` | `NOT NULL` | none | used |
+| `description` | `String` | `description TEXT` | nullable | none | used |
+| `price` | `BigDecimal` | `price NUMERIC(10,2)` | nullable in DB, required by API validation | none | used |
+| `unit` | `String` | `unit VARCHAR(50)` | nullable, DB default `'шт'` | none | used |
+| `durationMinutes` | `Integer` | `duration_minutes INT` | nullable | none | used |
+| `status` | `ServiceStatus` | `status VARCHAR(20)` | `NOT NULL`, DB default `ACTIVE` | none | used (`ACTIVE/INACTIVE/DELETED`) |
+| `sortOrder` | `int` | `sort_order INT` | `NOT NULL`, DB default `0` | none | used |
+| `deletedAt` | `OffsetDateTime` | `deleted_at TIMESTAMPTZ` | nullable | none | used for soft-delete audit |
+| `createdAt` | `OffsetDateTime` | `created_at TIMESTAMPTZ` | `NOT NULL`, DB default `NOW()` | none | used |
+| `updatedAt` | `OffsetDateTime` | `updated_at TIMESTAMPTZ` | `NOT NULL`, DB default `NOW()` | none | used |
 
-### TenantSummaryResponse
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `id` | `Long` | — | — |
-| `slug` | `String` | — | — |
-| `name` | `String` | — | — |
-| `type` | `TenantType` | — | — |
-| `active` | `boolean` | — | — |
-| `timezone` | `String` | — | — |
-| `createdAt` | `OffsetDateTime` | — | — |
+### `Booking` (`booking`)
 
-### BookingStatusForm
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `status` | `BookingStatus` | `@NotNull` | MVC form model for `/admin/{slug}/panel/bookings/{bookingId}/status`; not used as JSON body. |
+| Field | Java type | DB column/type | Nullability/default/constraints | Relationships | Used vs reserved |
+|---|---|---|---|---|---|
+| `id` | `Long` | `id BIGSERIAL` | PK | none | used |
+| `tenant` | `Tenant` | `tenant_id BIGINT` | `NOT NULL`, FK `tenant(id)` | `@ManyToOne(fetch = LAZY, optional = false)` | used |
+| `type` | `BookingType` | `type VARCHAR(20)` | `NOT NULL` | none | currently always set to `ORDER`; other enum values reserved |
+| `telegramUserId` | `Long` | `telegram_user_id BIGINT` | `NOT NULL` | none | used |
+| `customerName` | `String` | `customer_name VARCHAR(255)` | `NOT NULL` | none | used |
+| `customerPhone` | `String` | `customer_phone VARCHAR(50)` | nullable | none | used |
+| `deliveryAddress` | `String` | `delivery_address TEXT` | nullable in DB, required by API validation | none | used |
+| `status` | `BookingStatus` | `status VARCHAR(20)` | `NOT NULL`, DB default `NEW` | none | used |
+| `trackingUrl` | `String` | `tracking_url TEXT` | nullable | none | used |
+| `note` | `String` | `note TEXT` | nullable | none | used |
+| `totalPrice` | `BigDecimal` | `total_price NUMERIC(10,2)` | nullable | none | used |
+| `deliveryDate` | `LocalDate` | `delivery_date DATE` | nullable in DB, required by API validation | none | used |
+| `slotId` | `Long` | `slot_id BIGINT` | nullable | none | reserved (no service/controller usage) |
+| `service` | `CatalogService` | `service_id BIGINT` | nullable FK `service(id)` | `@ManyToOne(fetch = LAZY)` | reserved (no service/controller usage) |
+| `deletedAt` | `OffsetDateTime` | `deleted_at TIMESTAMPTZ` | nullable | none | used in repository filters |
+| `createdAt` | `OffsetDateTime` | `created_at TIMESTAMPTZ` | `NOT NULL`, DB default `NOW()` | none | used |
+| `updatedAt` | `OffsetDateTime` | `updated_at TIMESTAMPTZ` | `NOT NULL`, DB default `NOW()` | none | used |
+| `version` | `Long` | `version BIGINT` | `NOT NULL`, DB default `0`, optimistic lock | `@Version` | used |
 
-### ServiceForm
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `name` | `String` | `@NotBlank` | MVC form model; converted to `AdminUpsertServiceRequest`. |
-| `description` | `String` | — | — |
-| `price` | `BigDecimal` | `@NotNull` | — |
-| `unit` | `String` | — | — |
-| `durationMinutes` | `Integer` | — | — |
-| `sortOrder` | `Integer` | — | — |
-| `status` | `ServiceStatus` | `@NotNull` | Default `ACTIVE`. |
+### `BookingItem` (`booking_item`)
 
-### SuperAdminTenantForm
-| Field | Type | Validation | Notes |
-|-------|------|-----------|-------|
-| `slug` | `String` | `@NotBlank` | MVC form model; used on create and update forms, but update flow does not write slug back to entity. |
-| `name` | `String` | `@NotBlank` | — |
-| `type` | `TenantType` | `@NotNull` | Default `FOOD_ORDER`. |
-| `botToken` | `String` | — | — |
-| `ownerTelegramId` | `Long` | — | — |
-| `timezone` | `String` | — | Default `Asia/Ho_Chi_Minh`. |
-| `primaryColor` | `String` | — | — |
-| `logoUrl` | `String` | — | — |
-| `welcomeMessage` | `String` | — | — |
-| `adminUsername` | `String` | `@NotBlank` | — |
-| `adminPassword` | `String` | — | Controller additionally requires non-blank password on create form. |
-| `active` | `boolean` | — | Default `true`. |
+| Field | Java type | DB column/type | Nullability/default/constraints | Relationships | Used vs reserved |
+|---|---|---|---|---|---|
+| `id` | `Long` | `id BIGSERIAL` | PK | none | used |
+| `booking` | `Booking` | `booking_id BIGINT` | `NOT NULL`, FK `booking(id) ON DELETE CASCADE` | `@ManyToOne(fetch = LAZY, optional = false)` | used |
+| `service` | `CatalogService` | `service_id BIGINT` | `NOT NULL`, FK `service(id)` | `@ManyToOne(fetch = LAZY, optional = false)` | used |
+| `quantity` | `int` | `quantity INT` | `NOT NULL`, DB check `quantity > 0` | none | used |
+| `unitPrice` | `BigDecimal` | `unit_price NUMERIC(10,2)` | `NOT NULL` | none | used |
+| `currency` | `String` | `currency VARCHAR(10)` | `NOT NULL` | none | used |
 
-## Entities
+### `AuditLog` (`audit_log`)
 
-### tenant
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | `BIGSERIAL` | no | — | PK |
-| `slug` | `VARCHAR(100)` | no | — | Unique |
-| `name` | `VARCHAR(255)` | no | — | JPA does not declare length; SQL does. |
-| `type` | `VARCHAR(30)` | no | — | Enum `TenantType` stored as string |
-| `bot_token` | `VARCHAR(255)` | yes | — | — |
-| `owner_telegram_id` | `BIGINT` | yes | — | — |
-| `timezone` | `VARCHAR(50)` | no | `'Asia/Ho_Chi_Minh'` | — |
-| `active` | `BOOLEAN` | no | `TRUE` | `TenantContextFilter` only loads active tenants |
-| `created_at` | `TIMESTAMP WITH TIME ZONE` | no | `NOW()` | — |
-Indexes: unique constraint on `slug`.
+| Field | Java type | DB column/type | Nullability/default/constraints | Relationships | Used vs reserved |
+|---|---|---|---|---|---|
+| `id` | `Long` | `id BIGSERIAL` | PK | none | used |
+| `tenantId` | `Long` | `tenant_id BIGINT` | `NOT NULL` | none | used |
+| `entity` | `String` | `entity VARCHAR(50)` | `NOT NULL` | none | used |
+| `entityId` | `Long` | `entity_id BIGINT` | `NOT NULL` | none | used |
+| `action` | `String` | `action VARCHAR(50)` | `NOT NULL` | none | used |
+| `actorId` | `String` | `actor_id VARCHAR(255)` | nullable | none | used |
+| `oldValue` | `String` | `old_value TEXT` | nullable | none | used |
+| `newValue` | `String` | `new_value TEXT` | nullable | none | used |
+| `createdAt` | `OffsetDateTime` | `created_at TIMESTAMPTZ` | `NOT NULL`, DB default `NOW()` | none | used |
 
-### tenant_config
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | `BIGSERIAL` | no | — | PK |
-| `tenant_id` | `BIGINT` | no | — | FK -> `tenant(id)` |
-| `key` | `VARCHAR(100)` | no | — | — |
-| `value` | `TEXT` | yes | — | — |
-Constraints: unique (`tenant_id`, `key`).
+## 4) Enums
 
-### service
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | `BIGSERIAL` | no | — | PK |
-| `tenant_id` | `BIGINT` | no | — | FK -> `tenant(id)` |
-| `name` | `VARCHAR(255)` | no | — | — |
-| `description` | `TEXT` | yes | — | — |
-| `price` | `NUMERIC(10,2)` | yes | — | Booking creation rejects active service with null price |
-| `unit` | `VARCHAR(50)` | yes | `'шт'` | Service layer also defaults blank/null to `"шт"` |
-| `duration_minutes` | `INT` | yes | — | — |
-| `sort_order` | `INT` | no | `0` | Service layer also defaults null to `0` |
-| `status` | `VARCHAR(20)` | no | `'ACTIVE'` | Enum `ServiceStatus` stored as string |
-| `deleted_at` | `TIMESTAMP WITH TIME ZONE` | yes | — | Set on soft delete |
-| `created_at` | `TIMESTAMP WITH TIME ZONE` | no | `NOW()` | — |
-| `updated_at` | `TIMESTAMP WITH TIME ZONE` | no | `NOW()` | — |
-Indexes: `idx_service_tenant` on (`tenant_id`, `status`, `sort_order`, `id`) where `status <> 'DELETED'`.
+| Enum | Values | Referenced in |
+|---|---|---|
+| `BookingStatus` | `NEW`, `PAYMENT_PENDING`, `CONFIRMED`, `DELIVERING`, `DONE`, `CANCELLED` | `Booking`, `BookingService` transition matrix, `UpdateStatusRequest`, `BookingStatusForm`, booking/admin controllers |
+| `BookingType` | `ORDER`, `APPOINTMENT`, `REQUEST` | `Booking.type`, `BookingService.createFoodOrder` sets `ORDER` |
+| `ServiceStatus` | `ACTIVE`, `INACTIVE`, `DELETED` | `CatalogService.status`, catalog repositories/services/controllers/forms |
+| `TenantType` | `FOOD_ORDER`, `APPOINTMENT`, `CATALOG_REQUEST` | `Tenant.type`, tenant create/update DTOs/forms/services; food-order gating in `BookingService` and `AdminCatalogService` |
 
-### booking
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | `BIGSERIAL` | no | — | PK |
-| `tenant_id` | `BIGINT` | no | — | FK -> `tenant(id)` |
-| `type` | `VARCHAR(20)` | no | — | Entity requires explicit value; service currently writes `ORDER` |
-| `telegram_user_id` | `BIGINT` | no | — | — |
-| `customer_name` | `VARCHAR(255)` | no | — | — |
-| `customer_phone` | `VARCHAR(50)` | yes | — | Request DTO still requires non-blank value |
-| `status` | `VARCHAR(20)` | no | `'NEW'` | Enum `BookingStatus` stored as string |
-| `note` | `TEXT` | yes | — | — |
-| `total_price` | `NUMERIC(10,2)` | yes | — | Calculated after `booking_item` insert |
-| `delivery_date` | `DATE` | yes | — | Request DTO requires value in implemented create flow |
-| `slot_id` | `BIGINT` | yes | — | Present in schema and entity; not used by controllers/services |
-| `service_id` | `BIGINT` | yes | — | FK -> `service(id)`; present in schema and entity; not used by implemented create flow |
-| `deleted_at` | `TIMESTAMP WITH TIME ZONE` | yes | — | No controller sets it |
-| `created_at` | `TIMESTAMP WITH TIME ZONE` | no | `NOW()` | — |
-| `updated_at` | `TIMESTAMP WITH TIME ZONE` | no | `NOW()` | — |
-Indexes: `idx_booking_tenant` (`tenant_id`), `idx_booking_tenant_date` (`tenant_id`, `delivery_date`), `idx_booking_tenant_status` (`tenant_id`, `status`), `idx_booking_telegram_user` (`tenant_id`, `telegram_user_id`).
+## 5) Database schema (Flyway-derived)
 
-### booking_item
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | `BIGSERIAL` | no | — | PK |
-| `booking_id` | `BIGINT` | no | — | FK -> `booking(id)` with `ON DELETE CASCADE` |
-| `service_id` | `BIGINT` | no | — | FK -> `service(id)` |
-| `quantity` | `INT` | no | — | Check constraint `quantity > 0` |
-| `unit_price` | `NUMERIC(10,2)` | no | — | Copied from service price at booking time |
+### Final reconstructed schema (after V1..V8)
 
-### audit_log
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| `id` | `BIGSERIAL` | no | — | PK |
-| `tenant_id` | `BIGINT` | no | — | No FK constraint in SQL |
-| `entity` | `VARCHAR(50)` | no | — | — |
-| `entity_id` | `BIGINT` | no | — | — |
-| `action` | `VARCHAR(50)` | no | — | `CREATE`, `UPDATE`, `UPDATE_STATUS`, `DELETE`, `CANCEL` are written in code |
-| `actor_id` | `VARCHAR(255)` | yes | — | Changed from `BIGINT` to `VARCHAR(255)` in V2 |
-| `old_value` | `TEXT` | yes | — | JSON string |
-| `new_value` | `TEXT` | yes | — | JSON string |
-| `created_at` | `TIMESTAMP WITH TIME ZONE` | no | `NOW()` | — |
-Indexes: `idx_audit_tenant_entity` (`tenant_id`, `entity`, `entity_id`).
+```sql
+CREATE TABLE tenant (
+    id BIGSERIAL PRIMARY KEY,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(30) NOT NULL,
+    bot_token VARCHAR(255),
+    owner_telegram_id BIGINT,
+    timezone VARCHAR(50) NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
 
-## Enums
+CREATE TABLE tenant_config (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL REFERENCES tenant(id),
+    key VARCHAR(100) NOT NULL,
+    value TEXT,
+    UNIQUE (tenant_id, key)
+);
 
-### BookingStatus
-Values: `NEW`, `CONFIRMED`, `DONE`, `CANCELLED`
+CREATE TABLE service (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL REFERENCES tenant(id),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2),
+    unit VARCHAR(50) DEFAULT 'шт',
+    duration_minutes INT,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    sort_order INT NOT NULL DEFAULT 0,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
 
-### BookingType
-Values: `ORDER`, `APPOINTMENT`, `REQUEST`
+CREATE TABLE booking (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL REFERENCES tenant(id),
+    type VARCHAR(20) NOT NULL,
+    telegram_user_id BIGINT NOT NULL,
+    customer_name VARCHAR(255) NOT NULL,
+    customer_phone VARCHAR(50),
+    status VARCHAR(20) NOT NULL DEFAULT 'NEW',
+    note TEXT,
+    total_price NUMERIC(10, 2),
+    delivery_date DATE,
+    slot_id BIGINT,
+    service_id BIGINT REFERENCES service(id),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    version BIGINT NOT NULL DEFAULT 0,
+    delivery_address TEXT,
+    tracking_url TEXT
+);
 
-### ServiceStatus
-Values: `ACTIVE`, `INACTIVE`, `DELETED`
+CREATE TABLE booking_item (
+    id BIGSERIAL PRIMARY KEY,
+    booking_id BIGINT NOT NULL REFERENCES booking(id) ON DELETE CASCADE,
+    service_id BIGINT NOT NULL REFERENCES service(id),
+    quantity INT NOT NULL CHECK (quantity > 0),
+    unit_price NUMERIC(10, 2) NOT NULL,
+    currency VARCHAR(10) NOT NULL
+);
 
-### TenantType
-Values: `FOOD_ORDER`, `APPOINTMENT`, `CATALOG_REQUEST`
+CREATE TABLE audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    entity VARCHAR(50) NOT NULL,
+    entity_id BIGINT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    actor_id VARCHAR(255),
+    old_value TEXT,
+    new_value TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
 
-## Booking Validation Matrix
+CREATE INDEX idx_service_tenant
+    ON service(tenant_id, status, sort_order, id)
+    WHERE status <> 'DELETED';
 
-| Field | FOOD_ORDER | APPOINTMENT | CATALOG_REQUEST |
-|-------|-----------|-------------|-----------------|
-| `customerName` | required (`@NotBlank`) | not implemented; request rejected before type-specific field handling | not implemented; request rejected before type-specific field handling |
-| `customerPhone` | required (`@NotBlank`) | not implemented | not implemented |
-| `deliveryDate` | required (`@NotNull`) and must be `>= tenantTimeService.earliestDeliveryDate(...)` | not implemented | not implemented |
-| `note` | optional | not implemented | not implemented |
-| `items` | required, non-empty (`@NotEmpty`) | not implemented | not implemented |
-| `items[].serviceId` | required (`@NotNull`), service must exist in current tenant with `status = ACTIVE` | not implemented | not implemented |
-| `items[].quantity` | required, minimum `1` (`@Min(1)`) | not implemented | not implemented |
-| `Booking.type` persisted value | always `ORDER` | not implemented | not implemented |
-| `slotId` | ignored; not present in request DTO | ignored | ignored |
-| `booking.service` root field | ignored; not present in request DTO | ignored | ignored |
+CREATE INDEX idx_booking_tenant ON booking(tenant_id);
+CREATE INDEX idx_booking_tenant_date ON booking(tenant_id, delivery_date);
+CREATE INDEX idx_booking_tenant_status ON booking(tenant_id, status);
+CREATE INDEX idx_booking_telegram_user ON booking(tenant_id, telegram_user_id);
 
-Source: `BookingController#createBooking`, `BookingService#createFoodOrder`, `BookingService#requireFoodOrderTenant`, `BookingService#validateDeliveryDate`, `BookingService#toBookingItem`, `CreateBookingRequest`, `BookingItemRequest`
+CREATE INDEX idx_audit_tenant_entity ON audit_log(tenant_id, entity, entity_id);
+CREATE INDEX idx_audit_created_at_id ON audit_log(created_at DESC, id DESC);
+CREATE INDEX idx_audit_tenant_created_at_id ON audit_log(tenant_id, created_at DESC, id DESC);
+CREATE INDEX idx_audit_action_created_at_id ON audit_log(action, created_at DESC, id DESC);
+```
 
-## Security
+### Migration history
 
-### Filter chains
-- `/superadmin/**` -> custom `SuperAdminBasicAuthenticationFilter`; credentials from `app.superadmin.username` and `app.superadmin.password`; any request authenticated; CSRF disabled; form login disabled; logout disabled; HTTP Basic disabled in Spring and replaced by custom filter; anonymous disabled.
-- `/admin/*/**` -> `TenantContextFilter` then custom `TenantBasicAuthenticationFilter`; credentials from current tenant config keys `admin_username` and `admin_password` (BCrypt), plus superadmin credentials are also accepted here; any request authenticated; CSRF disabled; form login disabled; logout disabled; HTTP Basic disabled in Spring and replaced by custom filter; anonymous disabled.
-- `/t/*/**` -> `TenantContextFilter`; all requests permitted at Spring Security level; CSRF disabled; form login disabled; logout disabled; HTTP Basic disabled. Telegram auth is enforced only on controller parameters that require `@TelegramPrincipal`.
-- default (`/**`) -> permit all; CSRF disabled; anonymous enabled.
+| Version | Filename | One-line summary |
+|---|---|---|
+| 1 | `V1__baseline_schema.sql` | Initial tables (`tenant`, `tenant_config`, `service`, `booking`, `booking_item`, `audit_log`) + base indexes. |
+| 2 | `V2__audit_actor_id_as_string.sql` | `audit_log.actor_id` changed from numeric to `VARCHAR(255)`. |
+| 3 | `V3__service_status_model.sql` | Added `service.status`, backfilled from `active/deleted_at`, rebuilt service index, dropped `active`. |
+| 4 | `V4__audit_log_filter_indexes.sql` | Added audit feed/filter indexes by `created_at`, `(tenant_id, created_at)`, `(action, created_at)`. |
+| 5 | `V5__booking_optimistic_lock.sql` | Added `booking.version` (`NOT NULL DEFAULT 0`) for optimistic locking. |
+| 6 | `V6__booking_item_currency.sql` | Added `booking_item.currency`, backfilled from tenant `currency` config with fallback `USD`, set `NOT NULL`. |
+| 7 | `V7__booking_delivery_address.sql` | Added `booking.delivery_address` (`TEXT`). |
+| 8 | `V8__booking_tracking_url.sql` | Added `booking.tracking_url` (`TEXT`). |
 
-Authentication providers: Not implemented. Authentication is performed directly inside custom `OncePerRequestFilter` classes.
+## 6) Schema vs Entity drift
 
-CORS: Not implemented.
+| Area | Flyway schema | Entity mapping | Difference |
+|---|---|---|---|
+| `tenant_config` uniqueness | `UNIQUE (tenant_id, key)` | `TenantConfig` has no `@Table(uniqueConstraints=...)` | DB-enforced unique constraint not declared in JPA metadata. |
+| FK delete behavior | `booking_item.booking_id` uses `ON DELETE CASCADE` | `BookingItem.booking` has no cascade remove/orphan config in JPA | Delete cascade exists only at DB layer. |
+| DB defaults (`tenant`) | defaults on `timezone`, `active`, `created_at` | `Tenant` fields have no `columnDefinition/default` metadata | Defaults rely on DB; service usually sets values explicitly on create. |
+| DB defaults (`service`) | defaults on `unit`, `status`, `sort_order`, `created_at`, `updated_at` | `CatalogService` has no default metadata | Defaults in DB, while service code also sets values at write time. |
+| DB defaults (`booking`) | defaults on `status`, `created_at`, `updated_at`, `version` | `Booking` has no default metadata (except `@Version`) | Defaults in DB; service sets most values explicitly. |
+| DB default (`audit_log.created_at`) | `DEFAULT NOW()` | no default metadata in `AuditLog` | Timestamp default DB-side; service sets `createdAt` explicitly. |
+| `audit_log.actor_id` length | `VARCHAR(255)` | `@Column(name="actor_id")` with implicit provider length | Explicit SQL length not mirrored as explicit annotation parameter. |
 
-### Tenant resolution
-- Interceptor/filter: `TenantContextFilter`
-- Pattern: attached to `/admin/*/**` and `/t/*/**` security chains
-- Storage: `TenantContext` static `ThreadLocal<Tenant>`
-- Resolution rule: parses URI segments and uses the segment after `t` or `admin` as slug
-- Lookup: `TenantRepository.findBySlugAndActiveTrue(slug)`
-- Failure modes: 400 `"Tenant slug is missing"` if slug segment missing; 404 `"Tenant not found"` if tenant missing or inactive
+## 7) Security
 
-## Flyway Migrations
+### Security filter chains (`SecurityConfig`)
 
-| Version | Filename | Summary |
-|---------|----------|---------|
-| `V1` | `V1__baseline_schema.sql` | Creates `tenant`, `tenant_config`, `service`, `booking`, `booking_item`, `audit_log`; adds baseline indexes. |
-| `V2` | `V2__audit_actor_id_as_string.sql` | Changes `audit_log.actor_id` from numeric to string. |
-| `V3` | `V3__service_status_model.sql` | Adds `service.status`, backfills values from `active`/`deleted_at`, adds new partial index, drops `service.active`. |
+| Order | Bean method | Matcher | Authz | Custom filters and order |
+|---|---|---|---|---|
+| 1 | `superAdminSecurityFilterChain` | `/superadmin/**` | `anyRequest().authenticated()` | `SuperAdminBasicAuthenticationFilter` added **before** `BasicAuthenticationFilter` |
+| 2 | `adminSecurityFilterChain` | `/admin/*/**` | `anyRequest().authenticated()` | `TenantContextFilter` added **before** `BasicAuthenticationFilter`; `TenantBasicAuthenticationFilter` added **after** `TenantContextFilter` |
+| 3 | `tenantPublicSecurityFilterChain` | `/t/*/**` | `anyRequest().permitAll()` | `TenantContextFilter` added **before** `AnonymousAuthenticationFilter` |
+| 4 | `defaultSecurityFilterChain` | fallback | `permitAll` | no custom filters |
 
-## Schema vs Entity Drift
+All chains disable CSRF, form login, logout, HTTP Basic framework handler; custom filters handle basic auth where needed.  
+`FilterRegistrationBean` for all custom filters is disabled to avoid servlet container auto-registration outside Spring Security chain.
 
-- `tenant.name`: SQL length is `VARCHAR(255)`; entity does not declare length.
-- `tenant.timezone`, `tenant.active`, `tenant.created_at`: SQL defines defaults; entity does not model defaults.
-- `tenant.slug`: SQL has unique constraint; entity models `unique = true`.
-- `tenant_config`: SQL has unique (`tenant_id`, `key`) constraint; entity does not declare the unique constraint.
-- `service.unit`, `service.sort_order`, `service.status`, `service.created_at`, `service.updated_at`: SQL defines defaults; entity does not model defaults.
-- `service.name`: SQL length is `VARCHAR(255)`; entity does not declare length.
-- `service.active`: removed in V3 SQL; entity also no longer has this field. No drift here.
-- `booking.customer_name`: SQL length is `VARCHAR(255)`; entity does not declare length.
-- `booking.status`, `booking.created_at`, `booking.updated_at`: SQL defines defaults; entity does not model defaults.
-- `booking.customer_phone`: SQL allows null; request DTO requires non-blank in implemented create flow.
-- `booking.slot_id` and `booking.service_id`: present in SQL and entity, but unused by implemented controllers/services.
-- `booking_item.quantity`: SQL has check constraint `quantity > 0`; entity does not model the check constraint.
-- `booking_item.booking_id`: SQL has `ON DELETE CASCADE`; entity does not model cascade behavior.
-- `audit_log.actor_id`: latest SQL type `VARCHAR(255)` matches entity `String` after V2.
-- `audit_log.created_at`: SQL defines default `NOW()`; entity does not model default.
+### Custom filters behavior
 
-## Telegram Integration State
+| Filter | Credential source | Validation logic | Failure response |
+|---|---|---|---|
+| `SuperAdminBasicAuthenticationFilter` | `Authorization: Basic ...` | Decodes credentials, compares exact username/password against `SecurityProperties.superadmin` | `401` + `WWW-Authenticate: Basic realm="Yoobu Super Admin"` with reason (`Missing...`, `Invalid...`) |
+| `TenantBasicAuthenticationFilter` | `Authorization: Basic ...` | Requires `TenantContext` first; loads tenant admin settings from `TenantSettingsService` (`admin_username`, `admin_password` hash). Valid if BCrypt matches tenant creds. Also accepts superadmin plain credentials as bypass. | `401` + tenant realm (`Yoobu Tenant Admin: {slug}`) with reason (`Missing...`, `Invalid...`, `Admin credentials are not configured`) |
+| `TenantContextFilter` | URL path segment | Extracts slug from URI segments after `t` or `admin`, loads active tenant via `TenantRepository.findBySlugAndActiveTrue` and stores in `TenantContext` thread local | Missing slug -> `400 Tenant slug is missing`; missing/inactive tenant -> `404 Tenant not found` |
 
-- InitData validation: implemented in `TelegramInitDataValidator`; validates HMAC-SHA256 using tenant `bot_token`, requires `hash` and `user.id`, and returns `401 Invalid initData` on any failure.
-- Notifications on booking create: no.
-- Notifications on status change: no.
-- Daily summary: missing.
-- Dev fallback: in `dev` Spring profile, `TelegramUserArgumentResolver` accepts header `X-Telegram-User-Id` and creates `TelegramUser(id, "Dev", "User", null)` when `X-Telegram-Init-Data` is absent.
+### Tenant context
 
-## Configuration Shape
+| Item | Behavior |
+|---|---|
+| Attachment points | `TenantContextFilter` is attached to `/admin/*/**` and `/t/*/**` chains, not to `/superadmin/**`. |
+| Slug parsing | `requestUri.split("/")`, first segment `t` or `admin`, next non-blank segment = tenant slug. |
+| Storage | `TenantContext` static `ThreadLocal<Tenant>` with `setCurrentTenant`, `getCurrentTenant`, `requireCurrentTenant`, `getRequiredTenantId`, `clear`. |
 
-Active profiles in `application.yml`: not configured.
+### Telegram auth
+
+| Component | Behavior |
+|---|---|
+| `TelegramInitDataValidator.validate` | Parses query-string-like init data into sorted map, removes `hash`, computes Telegram WebApp hash using HMAC-SHA256 (`secretKey = HMAC("WebAppData", botToken)` then HMAC over data check string), compares with constant-time `MessageDigest.isEqual`. Extracts `user` JSON, requires non-null `id`. |
+| Tenant coupling | Uses `TenantContext.getCurrentTenant().botToken`; missing tenant or missing token -> `401 Invalid initData`. |
+| Resolver | `TelegramUserArgumentResolver` supports only `@TelegramPrincipal TelegramUser` params. Reads header `X-Telegram-Init-Data`; if absent and active profile matches `dev`, allows fallback from `X-Telegram-User-Id` (returns synthetic `TelegramUser(id, "Dev", "User", null)`). |
+| Dev fallback | Enabled only when `environment.matchesProfiles("dev")`. Invalid numeric header in dev -> `401 Invalid initData`. Non-dev without init data -> `401 Invalid initData`. |
+
+## 8) Service layer logic
+
+### `BookingService`
+
+| Public method | Called by | Behavior / rules | Audit log |
+|---|---|---|---|
+| `createFoodOrder(CreateBookingRequest, Long telegramUserId)` | `BookingController.createBooking` | Requires tenant type `FOOD_ORDER`; validates delivery date via `TenantTimeService` cutoff; builds booking + items from active services only; computes total; item currency from tenant pricing currency (trimmed, fallback `USD`). | `logCreate(entity="booking", actorId=telegramUserId)` |
+| `getMyBookings(Long)` | `BookingController.getMyBookings` | Tenant + user scoped list, excludes soft-deleted. | none |
+| `getMyBooking(Long, Long)` | `BookingController.getBooking` | Tenant + user scoped single fetch. | none |
+| `cancelMyBooking(Long, Long)` | `BookingController.cancelBooking` | Disallows cancel from `DONE`; sets `CANCELLED`. | `logAction(..., action="CANCEL", actorId=telegramUserId, old/new snapshot)` |
+| `confirmMyBookingPayment(Long, Long)` | `BookingController.confirmPayment` | Only allowed from `NEW`; sets `PAYMENT_PENDING`. | `logAction(..., action="CONFIRM_PAYMENT", actorId=telegramUserId, old/new snapshot)` |
+| `getAdminBookings(BookingStatus, LocalDate)` | `AdminBookingController.getBookings` | Tenant-scoped admin list with optional status/date filters. | none |
+| `getAdminBookingsPage(BookingStatus, LocalDate, int, int)` | `AdminPanelBookingController.bookings` | Same filters, pageable (`size` normalized: `<1 => 10`, max `100`). | none |
+| `getAdminBooking(Long)` | `AdminBookingController.getBooking`, `AdminPanelBookingController.bookingDetail` | Tenant-scoped single fetch. | none |
+| `updateBookingStatus(Long, BookingStatus)` / overload with tracking URL | REST and panel update handlers | Enforces transition matrix (`NEW -> {NEW,CANCELLED}`, `PAYMENT_PENDING -> {PAYMENT_PENDING,CONFIRMED,CANCELLED}`, `CONFIRMED -> {CONFIRMED,DELIVERING,CANCELLED}`, `DELIVERING -> {DELIVERING,DONE,CANCELLED}`, `DONE -> {DONE,CANCELLED}`, `CANCELLED -> {CANCELLED}`); validates tracking URL (http/https + host) when provided; preserves existing tracking URL when `trackingUrl == null`; blank tracking URL clears it; optimistic lock conflicts mapped to `409`. | `logAction(..., action="UPDATE_STATUS", actorId=currentActorId())` |
+| `getAllowedAdminStatuses(BookingStatus)` | panel controllers | Returns allowed enum subset for UI controls. | none |
+
+### `AdminCatalogService`
+
+| Public method | Called by | Behavior / rules | Audit log |
+|---|---|---|---|
+| `getAdminServices()` | `AdminCatalogController.getServices` | Requires `FOOD_ORDER`; returns all non-`DELETED`. | none |
+| `getAdminServicesPage(String,int,int)` | `AdminPanelServiceController.services` | Optional name contains filter; pageable (`<1 => 20`, max `100`). | none |
+| `getAdminService(Long)` | panel edit/delete/status flows | Tenant + non-deleted lookup. | none |
+| `createService(AdminUpsertServiceRequest)` | REST create, panel create | Requires `FOOD_ORDER`; applies defaults (`unit="шт"` when blank, `sortOrder=0` when null, status default `ACTIVE`); rejects status `DELETED` in upsert. | `logCreate(entity="service", actorId=currentActorId())` |
+| `updateService(Long, AdminUpsertServiceRequest)` | REST update, panel update/status | Same rules; if status not `DELETED` then clears `deletedAt`; updates `updatedAt`. | `logUpdate(entity="service", actorId=currentActorId(), old/new)` |
+| `deleteService(Long)` | REST delete, panel delete | Soft delete: status `DELETED`, sets `deletedAt`. | `logAction(action="DELETE", entity="service", actorId=currentActorId(), old/new)` |
+
+### `CatalogQueryService`
+
+| Public method | Called by | Behavior |
+|---|---|---|
+| `getActiveServices()` | `CatalogController.getServices` | Tenant-scoped `ACTIVE` services ordered by `sortOrder,id`. |
+
+### `TenantManagementService`
+
+| Public method | Called by | Behavior / rules | Audit log |
+|---|---|---|---|
+| `getAllTenants()` | `SuperAdminTenantController.getTenants` | Returns all tenants ordered by createdAt desc. | none |
+| `getAllTenantsPage(String,int,int)` | `SuperAdminPanelController.tenants` | Optional query against name/slug; pageable (`<1 => 20`, max `100`). | none |
+| `getTenant(Long)` | superadmin REST + panel detail/edit | Loads tenant + full config map (`TenantSettings.asMap`). | none |
+| `isSlugAvailable(String)` | slug-availability endpoint, panel create validation | `true` only for non-blank trimmed slug absent in DB. | none |
+| `createTenant(CreateTenantRequest)` | superadmin REST + panel create | Rejects duplicate slug (`409`); sets defaults (`timezone` fallback `Asia/Ho_Chi_Minh`, active true, currency fallback `USD`); stores tenant config entries including hashed admin password and normalized payment QR URL. | `logCreate(entity="tenant", tenantId=createdTenantId, actorId=currentActorId(), snapshot)` |
+| `updateTenant(Long, UpdateTenantRequest)` | superadmin REST + panel update | Updates tenant core fields; upserts configs; blank optional fields removed when `removeWhenBlank=true`; blank `adminPassword` keeps existing hash; currency maintained/seeded to default if missing; payment QR normalized/validated. | `logUpdate(entity="tenant", tenantId=tenantId, actorId=currentActorId(), old/new snapshot)` |
+
+### `TenantSettingsService`
+
+| Public method | Called by | Behavior |
+|---|---|---|
+| `getSettings(Long tenantId)` | auth, booking, tenant config mapping, tenant management snapshots | Loads all `tenant_config` rows and builds `TenantSettings`. |
+| `getCurrentTenantSettings()` | tenant/public/panel flows | Same using `TenantContext.getRequiredTenantId()`. |
+
+### `TenantConfigService`
+
+| Public method | Called by | Behavior |
+|---|---|---|
+| `getCurrentTenantConfig()` | `TenantPublicController.getConfig` | Reads current tenant + settings and maps to `TenantConfigResponse`. |
+
+### `TenantTimeService`
+
+| Public method | Called by | Behavior |
+|---|---|---|
+| `now(Tenant)` / `today(Tenant)` | tests, time helpers | Uses injected `Clock` and tenant `ZoneId`. |
+| `earliestDeliveryDate(Tenant, TenantSettings)` | `BookingService.validateDeliveryDate` | Uses optional `cutoff_hour` + `cutoff_minute`; if now is at/after cutoff, earliest date is tomorrow, else today. Incomplete/invalid cutoff config throws `IllegalStateException`. |
+
+### `AuditLogService`
+
+| Public method | Called by | Behavior |
+|---|---|---|
+| `logCreate`, `logUpdate`, `logAction` | `BookingService`, `AdminCatalogService`, `TenantManagementService` | Persists serialized old/new snapshots with UTC timestamp. |
+| `currentActorId()` | business services | Reads Spring Security principal; supports numeric/string principals. |
+| `search(...)` | `SuperAdminAuditController.getAuditLogs`, `SuperAdminPanelController.audit` | Filter by tenant/entity/action/actor/time range; sort `createdAt DESC, id DESC`; page size normalized (`default 20`, max `50`). |
+| `searchForExport(...)` | audit export endpoints | Same filters, first page only, size capped at `5000`. |
+| `exportLimit()` | panel audit page | Returns `5000`. |
+
+### `AuditLogCsvExporter`
+
+| Public method | Called by | Behavior |
+|---|---|---|
+| `toCsv(List<AuditLogItemResponse>)` | superadmin REST export + panel export | Emits CSV headers + rows; wraps values in quotes; escapes quotes; prefixes `'=+-@` leading cells with `'` to avoid spreadsheet formula injection. |
+
+### `AuditLogChangeFormatter`
+
+| Public method | Called by | Behavior |
+|---|---|---|
+| `buildDiffLines(AuditLogItemResponse)` | panel audit view, csv exporter | For map payloads, compares top-level keys and renders `key: old -> new`; else `value: old -> new`; returns fallback messages for no changes. |
+| `summarizeChanges(AuditLogItemResponse)` | csv exporter | Joins diff lines by ` | `. |
+
+## 9) Configuration
+
+### `application.yml` (full)
 
 ```yaml
 spring:
@@ -415,11 +502,14 @@ spring:
     locations: classpath:db/migration
 
 app:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,https://localhost:*,https://127.0.0.1:*,https://*.up.railway.app}
   superadmin:
     username: ${SUPERADMIN_USER:superadmin}
     password: ${SUPERADMIN_PASS:superadmin}
 
 server:
+  port: ${PORT:8080}
   error:
     include-message: always
 
@@ -428,17 +518,86 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger - %msg%n"
 ```
 
-## Test Coverage Map
+`application-*.yml` in `src/main/resources`: not present.
 
-| Test file | Current covered behavior |
-|-----------|--------------------------|
-| `SuperAdminTenantControllerIT` | Superadmin auth, tenant CRUD, slug availability, duplicate slug rejection, optional field clearing, password retention, inactive tenant behavior |
-| `TenantAdminAccessIT` | Tenant admin auth success/failure, missing credentials, superadmin access to tenant admin endpoints |
-| `TenantIsolationIT` | Cross-tenant isolation for services and admin auth realms |
-| `TenantAdminCatalogAndBookingIT` | Happy path from service creation to public catalog and booking |
-| `TenantFoodOrderConstraintsIT` | Restriction of booking/service flows to `FOOD_ORDER`, deleted service behavior, unknown service rejection |
-| `BookingLifecycleIT` | Customer booking create/list/read/cancel, admin read/update, audit log writes, cancel conflict on `DONE` |
-| `ServiceManagementAndValidationIT` | Public tenant config, service update/delete, booking filtering, bean validation failures, delivery-date cutoff validation |
-| `AdminPanelIT` | Tenant admin MVC panel routes and form submissions |
-| `SuperAdminPanelIT` | Superadmin MVC panel routes and form submissions |
-| `TenantTimeServiceTest` | Tenant-local date and cutoff calculations |
+### `AppProperties` fields and consumption
+
+`AppProperties` class is not present in the source tree.  
+`app.*` keys are bound via:
+
+| Class | Prefix | Fields | Consumed by |
+|---|---|---|---|
+| `SecurityProperties` | `app` | `superadmin.username`, `superadmin.password` | `SecurityConfig` -> `SuperAdminBasicAuthenticationFilter`; also superadmin fallback in `TenantBasicAuthenticationFilter` |
+| `CorsProperties` | `app.cors` | `allowedOriginPatterns`, `allowedMethods`, `allowedHeaders`, `exposedHeaders`, `allowCredentials`, `maxAge` | `CorsConfig.corsConfigurationSource` |
+
+### Tenant config keys (`tenant_config.key`) and readers
+
+| Key | Written by | Read by |
+|---|---|---|
+| `admin_username` | `TenantManagementService.createTenant/updateTenant` | `TenantSettings.admin()`, `TenantBasicAuthenticationFilter`, superadmin tenant detail/panel |
+| `admin_password` | create/update (BCrypt hash) | `TenantSettings.admin()`, `TenantBasicAuthenticationFilter` |
+| `currency` | create/update (default `USD`) | `TenantSettings.pricing()`, `BookingService` currency assignment, panel/service money formatting context |
+| `primary_color` | create/update | `TenantSettings.branding()`, `/t/{slug}/config`, panel |
+| `logo_url` | create/update | same |
+| `welcome_message` | create/update | same |
+| `checkout_name_hint` | create/update | same |
+| `checkout_phone_hint` | create/update | same |
+| `checkout_note_hint` | create/update | same |
+| `payment_qr_url` | create/update (normalized by `PaymentQrUrlValidator`) | `TenantSettings.payment()`, `/t/{slug}/config`, panel |
+| `cutoff_hour` | not written by current controller/service flows | `TenantSettings.delivery()`, `TenantTimeService` |
+| `cutoff_minute` | not written by current controller/service flows | `TenantSettings.delivery()`, `TenantTimeService` |
+
+## 10) Test coverage
+
+### Test infrastructure
+
+| Class | Infra details |
+|---|---|
+| `IntegrationTestSupport` | `@SpringBootTest`, `@AutoConfigureMockMvc`, `@ActiveProfiles("dev")`; shared `PostgreSQLContainer("postgres:17-alpine")`; dynamic datasource/superadmin props; DB reset before each test via `TRUNCATE ... RESTART IDENTITY CASCADE`; helpers for superadmin/tenant basic auth and Telegram dev header. |
+| Web MVC tests (`BookingControllerWebMvcTest`, `AdminBookingControllerWebMvcTest`) | `@WebMvcTest(..., addFilters=false)` + stubbed services + custom `TelegramInitDataValidator` bean. |
+| Unit tests (`BookingServiceTest`, `AuditLogServiceTest`, etc.) | Proxy stubs/test doubles for repositories/services; no DB container. |
+
+### Per test class coverage
+
+| Test class | Coverage summary |
+|---|---|
+| `CorsConfigurationIT` | CORS headers on tenant public endpoint and admin preflight behavior without auth challenge. |
+| `TelegramUserArgumentResolverTest` | Resolver parameter support, initData path, dev fallback header path, invalid/no header unauthorized behavior. |
+| `AuditLogServiceTest` | Search page-size caps, export cap, principal extraction, enum/temporal serialization, nested JSON parsing from text fields. |
+| `TenantContextTest` | `TenantContext` success/failure semantics. |
+| `TenantSettingsServiceTest` | `getSettings` and `getCurrentTenantSettings` wiring to repository/context. |
+| `TenantSettingsTest` | Duplicate-key override, read-only map, domain slices (`admin/branding/checkout/delivery/pricing`) and default currency fallback. |
+| `TenantTimeServiceTest` | Timezone-aware dates, cutoff behavior, edge at exact cutoff, no cutoff behavior. |
+| `PaymentQrUrlValidatorTest` | Valid/invalid URL normalization rules and error reason. |
+| `BookingControllerWebMvcTest` | Client booking controller binding/validation and delegation for create/list/get/cancel/confirm endpoints. |
+| `AdminBookingControllerWebMvcTest` | Admin status update binding (`trackingUrl` present/null), max-length validation. |
+| `BookingServiceTest` | Total/currency computation, transition rejection/allowance cases, tracking URL normalization rules, page-size normalization, allowed-status matrix slices. |
+| `TenantAdminAccessIT` | Tenant basic auth success/failure, superadmin access to tenant admin endpoints, missing credentials challenge. |
+| `TenantIsolationIT` | Cross-tenant admin credential isolation and service visibility separation. |
+| `TenantFoodOrderConstraintsIT` | Tenant type gating (`FOOD_ORDER` only), unknown/deleted service booking rejection, cross-tenant booking admin access denial. |
+| `TenantAdminCatalogAndBookingIT` | End-to-end tenant admin service create + customer booking + admin listing/filtering. |
+| `ServiceManagementAndValidationIT` | Public config output, payment QR update/clear reflection, service update/delete behavior, booking status filter, request payload validation, delivery-date validation by tenant timezone. |
+| `BookingLifecycleIT` | Full booking lifecycle for customer and admin, ownership constraints, payment confirm rules, transition matrix outcomes, tracking URL propagation, audit entries, currency immutability for existing bookings after tenant currency change. |
+| `BookingOptimisticLockingIT` | JPA optimistic locking conflict on stale booking update (`version` behavior). |
+| `SuperAdminTenantControllerIT` | Superadmin auth/challenge paths, tenant create/read/update, slug availability, duplicate slug, payment QR validation, password keep/rotate behavior, deactivation effects. |
+| `SuperAdminAuditControllerIT` | Audit API filtering/pagination/caps/auth/export CSV. |
+| `SuperAdminPanelIT` | Superadmin Thymeleaf panel tenant CRUD forms, credential rotation, duplicate slug form error, panel audit rendering/filter/export links. |
+| `AdminPanelIT` | Tenant admin Thymeleaf panel rendering, booking/service form mutations, inline status updates, delete confirmation flow, tracking URL UI behavior, flash messaging and redirect behavior. |
+| `AuditLogIndexPlanIT` | `EXPLAIN` index usage assertions for audit queries (`idx_audit_*`). |
+
+## 11) Not yet implemented / currently unused
+
+### Schema/entity elements with no active controller/service flow
+
+| Item | Location | Current status |
+|---|---|---|
+| Appointment/request booking types | `BookingType.APPOINTMENT`, `BookingType.REQUEST` | No controller/service path creates these; current booking creation always sets `BookingType.ORDER`. |
+| Booking slot linkage | `booking.slot_id`, `Booking.slotId` | No controller/service logic reads/writes `slotId`. |
+| Direct booking->service link | `booking.service_id`, `Booking.service` | No controller/service logic uses this relation; itemized model uses `booking_item.service_id`. |
+| Delivery cutoff config write path | `TenantConfigKeys.CUTOFF_HOUR`, `TenantConfigKeys.CUTOFF_MINUTE` | Read by `TenantTimeService`, but no current create/update endpoint/form sets these keys. |
+| `TenantConfigRepository.findByTenantIdAndKey` | repository method | Declared but not used by current production code paths. |
+
+### Referenced-in-comments/docs missing classes
+
+No missing classes were identified from in-code comments in scanned source files.
+

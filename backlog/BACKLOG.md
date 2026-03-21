@@ -78,3 +78,4 @@ This document tracks product and engineering ideas to consider outside of Jira.
 72. [x] UI order history, поменять местами текущий заказ и предыдущие заказы. текущий заказ наверх
 73. [ ] уменьшить карточки товаров
 74. [ ] добавить картинки? но это тут пиздец будет.
+75. [x] link for tracking when order is confirmed and during delivery
