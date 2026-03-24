@@ -83,4 +83,7 @@ This document tracks product and engineering ideas to consider outside of Jira.
 77. [ ] PHOTO Drag-and-drop в panel (потом)
 78. [ ] PHOTO Watermark / tenant branding на фото
 79. [ ] PHOTO Image optimization pipeline (Sharp/libvips) — потом, когда будет нагрузка
-80. [ ] telegram notification for order confirmation
+80. [x] telegram notification for order confirmation
+81. [ ] управление активностью товаров. активный статус сейчас больше для выдачи. а можно добавить что просто недоступен, типа на сегодня закончился
+82. [ ] плюс к верхнему пункту, количество на данный момент. то есть если поставили 10, то товар заблочится когда 10 заказов будет, при этом разболочится если кто-то отменил заказ 
+83. [ ] cut off time for ordering. то есть выбираешь время время, до которого принимаешь заказы на сегодня или вообще
