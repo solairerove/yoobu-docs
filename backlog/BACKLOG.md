@@ -19,7 +19,7 @@ This document tracks product and engineering ideas to consider outside of Jira.
 13. [x] audits
 14. [x] show tenants with active not active statuses on superadmin page
 15. [x] Add search/sort/pagination for bookings, services, and tenants lists. Right now they render full tables only, so operations degrade as data grows: bookings.html, services.html, tenants.html.
-16. [ ] aop for auditing
+16. [ ] ~~aop for auditing~~
 17. [x] superadmin should be able to activate/deactivate services?
 18. [x] on admin panel there should be a confirmation dialog for deleting a service
 19. [x] on admin panel for booking and service statuses i think we should able to update status right here, rather then on detailed form.
@@ -76,6 +76,11 @@ This document tracks product and engineering ideas to consider outside of Jira.
 70. [x] если отменить отмененный заказ
 71. [x] UI checkout delivery date выходит за границы и окно это плавает
 72. [x] UI order history, поменять местами текущий заказ и предыдущие заказы. текущий заказ наверх
-73. [ ] уменьшить карточки товаров
-74. [ ] добавить картинки? но это тут пиздец будет.
+73. [x] уменьшить карточки товаров
+74. [x] добавить картинки? но это тут пиздец будет.
 75. [x] link for tracking when order is confirmed and during delivery
+76. [ ] PHOTO Ресайз/кроп на бэкенде (клиент загружает готовое фото, потом)
+77. [ ] PHOTO Drag-and-drop в panel (потом)
+78. [ ] PHOTO Watermark / tenant branding на фото
+79. [ ] PHOTO Image optimization pipeline (Sharp/libvips) — потом, когда будет нагрузка
+80. [ ] telegram notification for order confirmation
