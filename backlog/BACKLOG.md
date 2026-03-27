@@ -91,3 +91,4 @@ This document tracks product and engineering ideas to consider outside of Jira.
 85. [ ] удалять перезаписанные фотографии
 86. [ ] image service on rust [TECH_SPEC_IMAGE_SERVICE.md](TECH_SPEC_IMAGE_SERVICE.md)
 87. [x] private railway communication between api and web 
+88. [ ] расширить телеграм нотификации хотя бы все поля передавать.
