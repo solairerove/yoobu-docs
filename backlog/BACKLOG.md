@@ -86,4 +86,8 @@ This document tracks product and engineering ideas to consider outside of Jira.
 80. [x] telegram notification for order confirmation
 81. [ ] управление активностью товаров. активный статус сейчас больше для выдачи. а можно добавить что просто недоступен, типа на сегодня закончился
 82. [ ] плюс к верхнему пункту, количество на данный момент. то есть если поставили 10, то товар заблочится когда 10 заказов будет, при этом разболочится если кто-то отменил заказ 
-83. [ ] cut off time for ordering. то есть выбираешь время время, до которого принимаешь заказы на сегодня или вообще
+83. [x] cut off time for ordering. то есть выбираешь время время, до которого принимаешь заказы на сегодня или вообще
+84. [ ] checkoutDeliveryHint уже есть на фронте
+85. [ ] удалять перезаписанные фотографии
+86. [ ] image service on rust [TECH_SPEC_IMAGE_SERVICE.md](TECH_SPEC_IMAGE_SERVICE.md)
+87. [x] private railway communication between api and web 
