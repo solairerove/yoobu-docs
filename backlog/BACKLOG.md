@@ -91,4 +91,6 @@ This document tracks product and engineering ideas to consider outside of Jira.
 85. [x] удалять перезаписанные фотографии
 86. [x] image service on rust [TECH_SPEC_IMAGE_SERVICE.md](TECH_SPEC_IMAGE_SERVICE.md)
 87. [x] private railway communication between api and web 
-88. [ ] расширить телеграм нотификации хотя бы все поля передавать.
+88. [x] расширить телеграм нотификации хотя бы все поля передавать.
+89. [ ] Cart persistence across refreshes. The store lives only in memory. Refreshing the page wipes the cart silently. A small localStorage sync on increase/decrease/reset and a hydration step on setConfig would give a much better feel — especially since users may background the Telegram Mini App and return.
+90. [ ] "Retry" on service load failure. Currently if getServices() fails, the user sees an error card with no action. The facade has no public retry method. Adding one and wiring up a "Try again" button to the error card would be straightforward.
